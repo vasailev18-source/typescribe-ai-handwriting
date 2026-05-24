@@ -1,0 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Fira+Code:wght@400;500&family=Bad+Script&family=Caveat:wght@400;700&family=Indie+Flower&family=Kalam:wght@400;700&family=Marck+Script&family=Neucha&family=Playpen+Sans:wght@400;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-outfit: "Outfit", sans-serif;
+  --font-serif: "Playfair Display", serif;
+  --font-fira: "Fira Code", monospace;
+  --font-caveat: "Caveat", cursive;
+  --font-marck: "Marck Script", cursive;
+  --font-badscript: "Bad Script", cursive;
+  --font-neucha: "Neucha", cursive;
+  --font-playpen: "Playpen Sans", cursive;
+}
+

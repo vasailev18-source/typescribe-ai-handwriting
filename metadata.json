@@ -1,0 +1,6 @@
+{
+  "name": "TypeScribe AI Почерк",
+  "description": "Продвинутая система генерации рукописного текста, оптимизированная для Telegram Web Apps, с поддержкой интерактивного рисования букв, настройки шумов и реалистичного наклона, а также парсинга формул LaTeX.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
