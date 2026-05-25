@@ -749,6 +749,21 @@ export const BASE_GLYPHS: Record<string, GlyphStrokes> = {
   '\\cdot': [
     [[23, 50], [26, 50]],
   ],
+  '\\to': [
+    [[10, 52], [42, 52]],
+    [[42, 52], [32, 42]],
+    [[42, 52], [32, 62]],
+  ],
+  '\\rightarrow': [
+    [[10, 52], [42, 52]],
+    [[42, 52], [32, 42]],
+    [[42, 52], [32, 62]],
+  ],
+  '→': [
+    [[10, 52], [42, 52]],
+    [[42, 52], [32, 42]],
+    [[42, 52], [32, 62]],
+  ],
   'Ә': [
     [[25, 45], [35, 45], [38, 20], [25, 18], [15, 30], [12, 55], [20, 75], [38, 70]]
   ],
@@ -844,37 +859,70 @@ export function splitWordIntoUnits(word: string): string[] {
   return units;
 }
 
-export function getUnitBaseWidth(unit: string, useFont?: boolean): number {
-  if (useFont) {
-    if (unit.length <= 1) {
-      const isWide = unit === 'm' || unit === 'w' || unit === 'М' || unit === 'Ш' || unit === 'W' || unit === 'M';
-      const isNarrow = unit === 'i' || unit === 'l' || unit === '!' || unit === ';' || unit === '.' || unit === ',' || unit === '1';
-      const isApo = unit === '\'' || unit === '’' || unit === '‘' || unit === 'ʻ';
-      return isApo ? 8 : (isWide ? 44 : isNarrow ? 15 : 28);
+export function getUnitBaseWidth(unit: string, useFont?: boolean, fontFamily?: string): number {
+  const getSingleCharWidth = (char: string): number => {
+    const isApo = char === '\'' || char === '’' || char === '‘' || char === 'ʻ';
+    if (isApo) return useFont ? 6 : 8;
+
+    const isNarrow = char === 'i' || char === 'l' || char === 'j' || char === 't' || char === 'f' ||
+                      char === '!' || char === ';' || char === ':' || char === '.' || char === ',' || 
+                      char === '1' || char === 'r' || char === 'г' || char === 'ь' || char === 'і' || char === 'ї' ||
+                      char === ' ' || char === '(' || char === ')' || char === '/' || char === '\\' || char === '-';
+
+    // Letters that are extra wide (need much more space to prevent overlap)
+    const isExtraWide = char === 'm' || char === 'w' || char === 'M' || char === 'W' || 
+                        char === 'Ж' || char === 'Ш' || char === 'Щ' || char === 'Ю' || char === 'Ф' || char === 'Ы' || char === 'М' || char === 'Д' ||
+                        char === 'ж' || char === 'ш' || char === 'щ' || char === 'ю' || char === 'ф' || char === 'ы' || char === 'м' || char === 'д';
+
+    const isUpper = char !== char.toLowerCase() && !!char.match(/[a-zA-Zа-яА-ЯЁё]/);
+
+    if (useFont) {
+      const fontLower = (fontFamily || '').toLowerCase();
+      if (fontLower.includes('caveat')) {
+        if (isExtraWide) return isUpper ? 42 : 36;
+        if (isNarrow) return 13;
+        if (isUpper) return 32;
+        return 24;
+      } else if (fontLower.includes('marck')) {
+        if (isExtraWide) return isUpper ? 50 : 44;
+        if (isNarrow) return 17;
+        if (isUpper) return 38;
+        return 31;
+      } else if (fontLower.includes('neucha')) {
+        if (isExtraWide) return isUpper ? 45 : 39;
+        if (isNarrow) return 14;
+        if (isUpper) return 33;
+        return 27;
+      } else if (fontLower.includes('bad')) {
+        if (isExtraWide) return isUpper ? 46 : 40;
+        if (isNarrow) return 15;
+        if (isUpper) return 34;
+        return 28;
+      }
+
+      if (isExtraWide) return isUpper ? 46 : 40;
+      if (isNarrow) return 14;
+      if (isUpper) return 34;
+      return 28;
+    } else {
+      // Procedural SVG handdrawn layout
+      if (isExtraWide) return isUpper ? 58 : 50;
+      if (isNarrow) return 24;
+      if (isUpper) return 46;
+      return 38;
     }
-    let sum = 0;
-    for (let i = 0; i < unit.length; i++) {
-       const ch = unit[i];
-       const isW = ch === 'm' || ch === 'w' || ch === 'М' || ch === 'Ш' || ch === 'W' || ch === 'M';
-       const isN = ch === 'i' || ch === 'l' || ch === '!' || ch === ';' || ch === '.' || ch === ',' || ch === '1';
-       const isApo = ch === '\'' || ch === '’' || ch === '‘' || ch === 'ʻ';
-       sum += isApo ? 8 : (isW ? 42 : isN ? 14 : 26);
-    }
-    return sum;
-  } else {
-    if (unit.length <= 1) {
-      const isApo = unit === '\'' || unit === '’' || unit === '‘' || unit === 'ʻ';
-      return isApo ? 10 : (unit === 'm' || unit === 'w' || unit === 'М' || unit === 'Ш' || unit === 'M' || unit === 'W' ? 55 : 40);
-    }
-    let sum = 0;
-    for (let i = 0; i < unit.length; i++) {
-      const ch = unit[i];
-      const isApo = ch === '\'' || ch === '’' || ch === '‘' || ch === 'ʻ';
-      const base = isApo ? 10 : (ch === 'm' || ch === 'w' || ch === 'М' || ch === 'Ш' || ch === 'M' || ch === 'W' ? 45 : 32);
-      sum += base;
-    }
-    return sum;
+  };
+
+  if (unit.length <= 1) {
+    return getSingleCharWidth(unit);
   }
+
+  let totalWidth = 0;
+  for (let i = 0; i < unit.length; i++) {
+    totalWidth += getSingleCharWidth(unit[i]);
+  }
+  // Apply connection packing factor for procedural layout
+  return useFont ? totalWidth : totalWidth * 0.94;
 }
 
 interface CompositeInfo {
@@ -1081,7 +1129,7 @@ export function renderGlyphToSVGPath(
 ): { pathData: string; width: number; firstPoint: [number, number]; lastPoint: [number, number]; useFont?: boolean; rotation?: number } {
   // If style uses a real font-family instead of procedural SVG strokes
   if (style?.useFont) {
-    const baseWidth = getUnitBaseWidth(char, true);
+    const baseWidth = getUnitBaseWidth(char, true, style?.fontFamily);
     const baseLetterSpacing = style ? style.letterSpacing : 0;
     const localSpacingOffset = config.spacingVariance * Math.cos(charIndex * 2.1 + lineIndex * 0.7);
     const targetCharWidth = (baseWidth * (size / 100)) + localSpacingOffset + config.letterSpacing + baseLetterSpacing;
@@ -1392,7 +1440,7 @@ export function renderGlyphToSVGPath(
   
   // Determine actual width to allocate for this character
   // Default cell size on grid is 50, standard characters are scaled
-  const baseWidth = getUnitBaseWidth(char);
+  const baseWidth = getUnitBaseWidth(char, false, style?.fontFamily);
   const baseLetterSpacing = style ? style.letterSpacing : 0;
   let targetCharWidth = (baseWidth * (size / 100)) + localSpacingOffset + config.letterSpacing + baseLetterSpacing;
 
@@ -1403,8 +1451,8 @@ export function renderGlyphToSVGPath(
   }
 
   // Let's calculate absolute first & last connection coordinates of this glyph
-  let firstPoint: [number, number] = [startX, startY + localBaselineOffset + (50 * (size / 100))];
-  let lastPoint: [number, number] = [startX + targetCharWidth, startY + localBaselineOffset + (50 * (size / 100))];
+  let firstPoint: [number, number] = [startX, startY + localBaselineOffset];
+  let lastPoint: [number, number] = [startX + targetCharWidth, startY + localBaselineOffset];
 
   // Set the precise coordinates based on actual character baseline shape
   if (finalStrokes.length > 0 && finalStrokes[0].length > 0) {
@@ -1412,7 +1460,7 @@ export function renderGlyphToSVGPath(
     const scaledX = (px * (size / 100));
     const scaledY = (py * (size / 100));
     const skewedX = scaledX + (scaledY * slantFactor);
-    firstPoint = [startX + skewedX, startY + scaledY + localBaselineOffset];
+    firstPoint = [startX + skewedX, startY + (py - 50) * (size / 100) + localBaselineOffset];
   }
   if (finalStrokes.length > 0) {
     const lastSt = finalStrokes[finalStrokes.length - 1];
@@ -1421,7 +1469,7 @@ export function renderGlyphToSVGPath(
       const scaledX = (px * (size / 100));
       const scaledY = (py * (size / 100));
       const skewedX = scaledX + (scaledY * slantFactor);
-      lastPoint = [startX + skewedX, startY + scaledY + localBaselineOffset];
+      lastPoint = [startX + skewedX, startY + (py - 50) * (size / 100) + localBaselineOffset];
     }
   }
 
@@ -1471,9 +1519,9 @@ export function renderGlyphToSVGPath(
       // Apply tilt (skew) modification
       const skewedX = scaledX + (scaledY * slantFactor);
 
-      // Final dynamic placement position
+      // Final dynamic placement position (subtract 50 * size / 100 to align baseline correctly)
       const finalX = startX + skewedX + coordJitterX + globalJitterX;
-      const finalY = startY + scaledY + localBaselineOffset + coordJitterY + globalJitterY;
+      const finalY = startY + (py - 50) * (size / 100) + localBaselineOffset + coordJitterY + globalJitterY;
 
       if (pointIdx === 0) {
         strokeString += `M ${finalX.toFixed(1)} ${finalY.toFixed(1)}`;
@@ -1502,7 +1550,7 @@ export interface RenderedPage {
   lines: Array<{
     y: number;
     elements: Array<{
-      type: 'text' | 'latex' | 'table';
+      type: 'text' | 'latex' | 'table' | 'form_line';
       pathData?: string;
       char?: string;
       x: number;
@@ -1515,9 +1563,10 @@ export interface RenderedPage {
       isPrinted?: boolean;
       isUnderlined?: boolean;
       isLine?: boolean;
+      label?: string;
       
       // Table properties
-      tableStyle?: 'ruler' | 'handdrawn';
+      tableStyle?: 'ruler' | 'handdrawn' | 'printed';
       tableRows?: string[][];
       tableHeight?: number;
     }>;
@@ -1534,10 +1583,12 @@ export function wrapTextIntoPages(
   text: string,
   config: PageConfig,
   style?: HandwritingStyle,
-  fontSize: number = 24
+  fontSize: number = 24,
+  availableStyles: HandwritingStyle[] = []
 ): Array<RenderedPage> {
+  const processedText = preprocessUserTextMath(text);
   const pages: Array<RenderedPage> = [];
-  const lines = text.split('\n');
+  const lines = processedText.split('\n');
   const maxLineWidth = PAGE_WIDTH - config.margins.left - config.margins.right;
   const maxLinesPerPage = Math.floor(
     (PAGE_HEIGHT - config.margins.top - config.margins.bottom) / config.lineSpacing
@@ -1546,8 +1597,184 @@ export function wrapTextIntoPages(
   let currentPageLines: RenderedPage['lines'] = [];
   let currentY = config.margins.top;
   let lineIndex = 0;
-  let activePrinted = false;
-  let activeUnderlined = false;
+
+  // Let's helper function to tokenize line inline
+  const tokenizeLine = (
+    lineText: string, 
+    defaultStyle: HandwritingStyle
+  ): any[] => {
+    const items: any[] = [];
+    let i = 0;
+    
+    const styleStack: HandwritingStyle[] = [defaultStyle];
+    const getCurrentStyle = () => styleStack[styleStack.length - 1] || defaultStyle;
+
+    const findStyle = (idOrName: string): HandwritingStyle | undefined => {
+      const s = availableStyles.find(x => x.id === idOrName || x.name === idOrName);
+      if (s) return s;
+      
+      const term = idOrName.toLowerCase();
+      // Font fallbacks
+      if (term.includes('caveat')) {
+        return { id: 'caveat-font', name: 'Caveat', creator: 'Ольга К.', description: '', slant: 3, letterSpacing: 2.5, baselineOffset: 1, glyphs: {}, useFont: true, fontFamily: 'Caveat' };
+      }
+      if (term.includes('marck')) {
+        return { id: 'marck-font', name: 'Marck Script', creator: 'Елена В.', description: '', slant: 8, letterSpacing: 1.0, baselineOffset: 3, glyphs: {}, useFont: true, fontFamily: 'Marck Script' };
+      }
+      if (term.includes('badscript') || term.includes('bad script')) {
+        return { id: 'badscript-font', name: 'Bad Script', creator: 'Николай П.', description: '', slant: 4, letterSpacing: 1.8, baselineOffset: 2, glyphs: {}, useFont: true, fontFamily: 'Bad Script' };
+      }
+      if (term.includes('neucha')) {
+        return { id: 'neucha-font', name: 'Neucha', creator: 'Павел С.', description: '', slant: 0, letterSpacing: 3.5, baselineOffset: 1, glyphs: {}, useFont: true, fontFamily: 'Neucha' };
+      }
+      if (term === 'serif' || term === 'print-serif') {
+        return {
+          id: 'print-serif',
+          name: '🖨️ Печатный Serif',
+          creator: 'Типография',
+          description: 'Times New Roman',
+          slant: 0,
+          letterSpacing: 2.0,
+          baselineOffset: 0,
+          glyphs: {},
+          useFont: true,
+          fontFamily: '"Times New Roman", Times, serif',
+          isPrinted: true
+        };
+      }
+      if (term === 'sans' || term === 'print-sans') {
+        return {
+          id: 'print-sans',
+          name: '🖨️ Печатный Sans',
+          creator: 'Типография',
+          description: 'Arial',
+          slant: 0,
+          letterSpacing: 2.0,
+          baselineOffset: 0,
+          glyphs: {},
+          useFont: true,
+          fontFamily: '"Inter", "Arial", sans-serif',
+          isPrinted: true
+        };
+      }
+      if (term === 'mono' || term === 'print-mono') {
+        return {
+          id: 'print-mono',
+          name: '🖨️ Печатная машинка',
+          creator: 'Машинка',
+          description: 'Courier New',
+          slant: 0,
+          letterSpacing: 2.5,
+          baselineOffset: 0,
+          glyphs: {},
+          useFont: true,
+          fontFamily: '"Courier New", Courier, monospace',
+          isPrinted: true
+        };
+      }
+      return undefined;
+    };
+
+    while (i < lineText.length) {
+      if (lineText[i] === '[') {
+        const closeBracketIndex = lineText.indexOf(']', i);
+        if (closeBracketIndex !== -1) {
+          const tagContent = lineText.slice(i + 1, closeBracketIndex).trim();
+          
+          if (tagContent.startsWith('style:')) {
+            const styleId = tagContent.replace('style:', '').trim();
+            const targetStyle = findStyle(styleId) || defaultStyle;
+            styleStack.push(targetStyle);
+            i = closeBracketIndex + 1;
+            continue;
+          } else if (tagContent === '/style') {
+            if (styleStack.length > 1) {
+              styleStack.pop();
+            }
+            i = closeBracketIndex + 1;
+            continue;
+          } else if (tagContent === 'print') {
+            const printStyle = findStyle('print-serif') || defaultStyle;
+            styleStack.push(printStyle);
+            i = closeBracketIndex + 1;
+            continue;
+          } else if (tagContent === '/print') {
+            if (styleStack.length > 1) {
+              styleStack.pop();
+            }
+            i = closeBracketIndex + 1;
+            continue;
+          } else if (tagContent.startsWith('print:')) {
+            const printType = tagContent.replace('print:', '').trim();
+            const printStyle = findStyle('print-' + printType) || findStyle(printType) || defaultStyle;
+            styleStack.push(printStyle);
+            i = closeBracketIndex + 1;
+            continue;
+          } else if (tagContent.startsWith('line:')) {
+            const parts = tagContent.split(':');
+            const widthStr = parts[1] || '150';
+            const labelStr = parts[2] || '';
+            const widthVal = parseInt(widthStr, 10) || 150;
+            items.push({
+              type: 'form_line_start',
+              width: widthVal,
+              label: labelStr
+            });
+            i = closeBracketIndex + 1;
+            continue;
+          } else if (tagContent === '/line') {
+            items.push({ type: 'form_line_end' });
+            i = closeBracketIndex + 1;
+            continue;
+          }
+        }
+      }
+
+      if (lineText[i] === ' ') {
+        items.push({ type: 'space' });
+        i++;
+      } else {
+        const wordChars: Array<{ char: string; style: HandwritingStyle }> = [];
+        while (i < lineText.length && lineText[i] !== ' ') {
+          if (lineText[i] === '[') {
+            const closeBracketIndex = lineText.indexOf(']', i);
+            if (closeBracketIndex !== -1) {
+              const tagContent = lineText.slice(i + 1, closeBracketIndex).trim();
+              if (tagContent.startsWith('style:') || tagContent === '/style' || tagContent === 'print' || tagContent === '/print' || tagContent.startsWith('print:') || tagContent.startsWith('line:') || tagContent === '/line') {
+                break;
+              }
+            }
+          }
+          wordChars.push({
+            char: lineText[i],
+            style: getCurrentStyle()
+          });
+          i++;
+        }
+        if (wordChars.length > 0) {
+          items.push({
+            type: 'word',
+            chars: wordChars
+          });
+        }
+      }
+    }
+
+    return items;
+  };
+
+  const defaultGlobalStyle = style || {
+    id: 'caveat-font',
+    name: 'Caveat',
+    creator: 'Ольга К.',
+    description: '',
+    slant: 3,
+    letterSpacing: 2.5,
+    baselineOffset: 1,
+    glyphs: {},
+    useFont: true,
+    fontFamily: 'Caveat'
+  };
 
   let i = 0;
   while (i < lines.length) {
@@ -1555,11 +1782,25 @@ export function wrapTextIntoPages(
     const trimmed = originalLine.trim();
 
     // Check if line is a table specifier or markdown table starts
-    let tableStyle: 'ruler' | 'handdrawn' = 'handdrawn';
+    let tableStyle: 'ruler' | 'handdrawn' | 'printed' = 'handdrawn';
     let isTableBlock = false;
     let tableLines: string[] = [];
 
-    if (trimmed.startsWith('[table:ruler]') || trimmed.startsWith('[table:straight]')) {
+    if (trimmed.startsWith('[table:printed]') || trimmed.startsWith('[table:print]')) {
+      tableStyle = 'printed';
+      isTableBlock = true;
+      i++; // skip specifier line
+      while (i < lines.length && !lines[i].trim().includes('[endtable]')) {
+        const line = lines[i].trim();
+        if (line.startsWith('|')) {
+          tableLines.push(line);
+        }
+        i++;
+      }
+      if (i < lines.length && lines[i].trim().includes('[endtable]')) {
+        i++; // skip [endtable]
+      }
+    } else if (trimmed.startsWith('[table:ruler]') || trimmed.startsWith('[table:straight]')) {
       tableStyle = 'ruler';
       isTableBlock = true;
       i++; // skip specifier line
@@ -1606,7 +1847,6 @@ export function wrapTextIntoPages(
       // Process tableLines into table row matrices
       const rows: string[][] = [];
       tableLines.forEach(tLine => {
-        // split by '|', but skip empty tokens on start/end
         const cells = tLine.split('|')
           .map(c => c.trim())
           .filter((c, idx, arr) => {
@@ -1614,7 +1854,6 @@ export function wrapTextIntoPages(
             if (idx === arr.length - 1 && tLine.endsWith('|') && c === '') return false;
             return true;
           });
-        // Ignore lines that are just dashes (like |---|---| in markdown tables)
         const isDashLine = cells.every(c => c.match(/^[- :]+$/));
         if (!isDashLine && cells.length > 0) {
           rows.push(cells);
@@ -1622,18 +1861,16 @@ export function wrapTextIntoPages(
       });
 
       if (rows.length > 0) {
-        // Calculate table element height
         const rowHeight = config.lineSpacing * 1.6;
         const tableHeight = rows.length * rowHeight;
 
-        // Page break check: if it doesn't fit, put the whole table on a new page
+        // Page break check
         if (currentY + tableHeight > PAGE_HEIGHT - config.margins.bottom && currentPageLines.length > 0) {
           pages.push({ lines: currentPageLines });
           currentPageLines = [];
           currentY = config.margins.top;
         }
 
-        // Add table element
         currentPageLines.push({
           y: currentY,
           elements: [{
@@ -1647,10 +1884,9 @@ export function wrapTextIntoPages(
           } as any]
         });
 
-        currentY += tableHeight + config.lineSpacing; // add space after table
+        currentY += tableHeight + config.lineSpacing;
         lineIndex++;
 
-        // Page break check
         if (currentY + config.lineSpacing > PAGE_HEIGHT - config.margins.bottom) {
           pages.push({ lines: currentPageLines });
           currentPageLines = [];
@@ -1665,20 +1901,21 @@ export function wrapTextIntoPages(
     if (trimmed.startsWith('$$') && trimmed.endsWith('$$')) {
       const formula = trimmed.slice(2, -2).trim();
       
-      // Page break check
       if (currentY + config.lineSpacing * 1.8 > PAGE_HEIGHT - config.margins.bottom) {
         pages.push({ lines: currentPageLines });
         currentPageLines = [];
         currentY = config.margins.top;
       }
 
+      const formulaWidth = measureLaTeXFormula(formula, fontSize, config, style);
+
       currentPageLines.push({
         y: currentY,
         elements: [{
           type: 'latex',
-          x: config.margins.left + (maxLineWidth / 2) - 80, // center-aligned LaTeX
+          x: config.margins.left + (maxLineWidth / 2) - (formulaWidth / 2),
           y: currentY,
-          width: 160,
+          width: formulaWidth,
           latexExpression: formula
         }]
       });
@@ -1688,97 +1925,141 @@ export function wrapTextIntoPages(
       continue;
     }
 
-    // Standard text wrapping
-    const words = originalLine.split(' ');
+    // Standard text wrapping using advanced visual parsing
+    const visualItems = tokenizeLine(originalLine, defaultGlobalStyle);
     let currentX = config.margins.left;
     let currentLineElements: RenderedPage['lines'][0]['elements'] = [];
+    let activeFormLineEndCoord: number | null = null;
 
-    const styleLetterSpacing = style ? style.letterSpacing : 0;
-
-    words.forEach((word) => {
-      if (word === '') {
+    visualItems.forEach((item: any) => {
+      if (item.type === 'space') {
         currentX += config.wordSpacing;
         return;
       }
 
-      let wordWidth = 0;
-      const charElements: Array<{ char: string; width: number; localOffset: number }> = [];
-      
-      const units = splitWordIntoUnits(word);
-      units.forEach((unit) => {
-        const baseWidth = getUnitBaseWidth(unit, style?.useFont);
-        const widthVal = (baseWidth * (fontSize / 100)) + config.letterSpacing + styleLetterSpacing;
-        charElements.push({ char: unit, width: widthVal, localOffset: wordWidth });
-        wordWidth += widthVal;
-      });
+      if (item.type === 'form_line_start') {
+        // Enforce form line fit check
+        if (currentX + item.width > PAGE_WIDTH - config.margins.right) {
+          if (currentLineElements.length > 0) {
+            currentPageLines.push({
+              y: currentY,
+              elements: currentLineElements
+            });
+            currentLineElements = [];
+            currentY += config.lineSpacing;
+            lineIndex++;
 
-      if (currentX + wordWidth > PAGE_WIDTH - config.margins.right) {
-        if (currentLineElements.length > 0) {
-          currentPageLines.push({
-            y: currentY,
-            elements: currentLineElements
-          });
-          currentLineElements = [];
-          
-          currentY += config.lineSpacing;
-          lineIndex++;
-
-          if (currentY + config.lineSpacing > PAGE_HEIGHT - config.margins.bottom) {
-            pages.push({ lines: currentPageLines });
-            currentPageLines = [];
-            currentY = config.margins.top;
+            if (currentY + config.lineSpacing > PAGE_HEIGHT - config.margins.bottom) {
+              pages.push({ lines: currentPageLines });
+              currentPageLines = [];
+              currentY = config.margins.top;
+            }
           }
+          currentX = config.margins.left;
         }
-        currentX = config.margins.left;
+
+        // Add pre-printed horizontal line
+        currentLineElements.push({
+          type: 'form_line',
+          x: currentX,
+          y: currentY,
+          width: item.width,
+          label: item.label
+        } as any);
+
+        activeFormLineEndCoord = currentX + item.width;
+        return;
       }
 
-      let lastCharEndPoint: [number, number] | null = null;
-      charElements.forEach((el, index) => {
-        const prevU = index > 0 ? charElements[index - 1].char : undefined;
-        const nextU = index < charElements.length - 1 ? charElements[index + 1].char : undefined;
-        const rendering = renderGlyphToSVGPath(
-          el.char,
-          currentX,
-          currentY,
-          fontSize,
-          config,
-          index + currentLineElements.length,
-          lineIndex,
-          style,
-          lastCharEndPoint,
-          prevU,
-          nextU
-        );
-
-        if (rendering.useFont) {
-          currentLineElements.push({
-            type: 'text',
-            char: el.char,
-            x: currentX,
-            y: rendering.lastPoint[1], // apply dynamic wobbly baseline
-            width: rendering.width,
-            useFont: true,
-            fontFamily: style?.fontFamily,
-            rotation: rendering.rotation
-          });
-          lastCharEndPoint = rendering.lastPoint;
-        } else if (rendering.pathData) {
-          currentLineElements.push({
-            type: 'text',
-            pathData: rendering.pathData,
-            char: el.char,
-            x: currentX,
-            y: currentY,
-            width: rendering.width
-          });
-          lastCharEndPoint = rendering.lastPoint;
-        } else {
-          lastCharEndPoint = null;
+      if (item.type === 'form_line_end') {
+        // Safe align to the pre-printed blank slot end
+        if (activeFormLineEndCoord !== null && currentX < activeFormLineEndCoord) {
+          currentX = activeFormLineEndCoord;
         }
-        currentX += rendering.width;
-      });
+        activeFormLineEndCoord = null;
+        return;
+      }
 
-      currentX += config.wordSpacing;
+      if (item.type === 'word') {
+        const wordChars = item.chars;
+        
+        // Compute total word width dynamically based on letters' individual style spacing
+        let wordWidth = 0;
+        const charLayouts = wordChars.map((charObj: any) => {
+          const baseWidth = getUnitBaseWidth(charObj.char, charObj.style.useFont, charObj.style.fontFamily);
+          const styleLetterSpacing = charObj.style.letterSpacing || 0;
+          const widthVal = (baseWidth * (fontSize / 100)) + config.letterSpacing + styleLetterSpacing;
+          return { char: charObj.char, style: charObj.style, width: widthVal };
+        });
+        wordWidth = charLayouts.reduce((sum: number, c: any) => sum + c.width, 0);
+
+        if (currentX + wordWidth > PAGE_WIDTH - config.margins.right) {
+          if (currentLineElements.length > 0) {
+            currentPageLines.push({
+              y: currentY,
+              elements: currentLineElements
+            });
+            currentLineElements = [];
+            
+            currentY += config.lineSpacing;
+            lineIndex++;
+
+            if (currentY + config.lineSpacing > PAGE_HEIGHT - config.margins.bottom) {
+              pages.push({ lines: currentPageLines });
+              currentPageLines = [];
+              currentY = config.margins.top;
+            }
+          }
+          currentX = config.margins.left;
+        }
+
+        let lastCharEndPoint: [number, number] | null = null;
+        charLayouts.forEach((charLayout: any, idx: number) => {
+          const prevU = idx > 0 ? charLayouts[idx - 1].char : undefined;
+          const nextU = idx < charLayouts.length - 1 ? charLayouts[idx + 1].char : undefined;
+          const rendering = renderGlyphToSVGPath(
+            charLayout.char,
+            currentX,
+            currentY,
+            fontSize,
+            config,
+            idx + currentLineElements.length,
+            lineIndex,
+            charLayout.style,
+            lastCharEndPoint,
+            prevU,
+            nextU
+          );
+
+          if (rendering.useFont) {
+            currentLineElements.push({
+              type: 'text',
+              char: charLayout.char,
+              x: currentX,
+              // Printed fonts sit straight on currentY baseline
+              y: charLayout.style.isPrinted ? currentY : rendering.lastPoint[1],
+              width: rendering.width,
+              useFont: true,
+              fontFamily: charLayout.style.fontFamily,
+              rotation: charLayout.style.isPrinted ? 0 : rendering.rotation
+            });
+            lastCharEndPoint = rendering.lastPoint;
+          } else if (rendering.pathData) {
+            currentLineElements.push({
+              type: 'text',
+              pathData: rendering.pathData,
+              char: charLayout.char,
+              x: currentX,
+              y: currentY,
+              width: rendering.width
+            });
+            lastCharEndPoint = rendering.lastPoint;
+          } else {
+            lastCharEndPoint = null;
+          }
+          currentX += rendering.width;
+        });
+      }
     });
 
     if (currentLineElements.length > 0) {
@@ -1823,7 +2104,7 @@ type MathNode =
   | { type: 'char'; char: string }
   | { type: 'symbol'; seq: string }
   | { type: 'frac'; num: MathNode; den: MathNode }
-  | { type: 'sqrt'; content: MathNode }
+  | { type: 'sqrt'; content: MathNode; degree?: MathNode }
   | { type: 'script'; base: MathNode; sub?: MathNode; sup?: MathNode }
   | { type: 'bigOp'; op: string; sub?: MathNode; sup?: MathNode }
   | { type: 'space' };
@@ -1865,7 +2146,8 @@ const REVERSE_ALIAS_MAP: Record<string, string> = {
   '\\degree': '°', '\\pm': '±', '\\times': '×', '\\div': '÷',
   '\\approx': '≈', '\\ne': '≠', '\\le': '≤', '\\ge': '≥',
   '\\partial': '∂', '\\nabla': '∇', '\\infty': '∞', '\\hbar': 'ħ',
-  '\\pi': 'π', '\\int': '∫', '\\sum': 'Σ', '\\cdot': '·'
+  '\\pi': 'π', '\\int': '∫', '\\sum': 'Σ', '\\cdot': '·',
+  '\\to': '→', '\\rightarrow': '→'
 };
 
 function parseLaTeXAST(expression: string): MathNode {
@@ -1887,7 +2169,7 @@ function parseLaTeXAST(expression: string): MathNode {
       if (isGroup && token === '}') {
         break;
       }
-      if (token === '}' || token === ')') {
+      if (token === '}') {
         break;
       }
       children.push(parseNode());
@@ -1933,24 +2215,30 @@ function parseLaTeXAST(expression: string): MathNode {
       '\\min': 'min'
     };
 
+    let baseNode: MathNode;
+
     if (knownOps[token]) {
       const expanded = knownOps[token];
       const children: MathNode[] = expanded.split('').map(c => ({ type: 'char', char: c }));
-      return { type: 'row', children };
-    }
-
-    if (token === '\\frac') {
+      baseNode = { type: 'row', children };
+    } else if (token === '\\frac') {
       const num = parseGroup();
       const den = parseGroup();
-      return { type: 'frac', num, den };
-    }
-
-    if (token === '\\sqrt') {
+      baseNode = { type: 'frac', num, den };
+    } else if (token === '\\sqrt') {
+      let degree: MathNode | undefined = undefined;
+      if (peek() === '[') {
+        next(); // consume '['
+        const degreeNodes: MathNode[] = [];
+        while (peek() && peek() !== ']') {
+          degreeNodes.push(parseNode());
+        }
+        if (peek() === ']') next(); // consume ']'
+        degree = degreeNodes.length === 1 ? degreeNodes[0] : { type: 'row', children: degreeNodes };
+      }
       const content = parseGroup();
-      return { type: 'sqrt', content };
-    }
-
-    if (token === '\\sum' || token === '\\int') {
+      baseNode = { type: 'sqrt', content, degree };
+    } else if (token === '\\sum' || token === '\\int') {
       const bigOpNode: MathNode & { type: 'bigOp' } = { type: 'bigOp', op: token };
       while (peek() === '_' || peek() === '^') {
         const scriptType = next();
@@ -1962,10 +2250,7 @@ function parseLaTeXAST(expression: string): MathNode {
         }
       }
       return bigOpNode;
-    }
-
-    let baseNode: MathNode;
-    if (token.startsWith('\\')) {
+    } else if (token.startsWith('\\')) {
       baseNode = { type: 'symbol', seq: token };
     } else if (token === '{') {
       const node = parseRow(true);
@@ -2062,7 +2347,7 @@ function buildLayout(
             const drawRes = renderGlyphToSVGPath(
               charStr,
               rx,
-              ry,
+              ry - size * 0.25,
               size,
               actualConfig,
               0,
@@ -2105,11 +2390,12 @@ function buildLayout(
 
     case 'frac': {
       const scaleFactor = 0.75;
-      const numLayout = buildLayout(node.num, size * scaleFactor, actualConfig, style, paths, horizontalLines, textElements);
-      const denLayout = buildLayout(node.den, size * scaleFactor, actualConfig, style, paths, horizontalLines, textElements);
+      const scaledSize = Math.max(11, size * scaleFactor);
+      const numLayout = buildLayout(node.num, scaledSize, actualConfig, style, paths, horizontalLines, textElements);
+      const denLayout = buildLayout(node.den, scaledSize, actualConfig, style, paths, horizontalLines, textElements);
 
       const fracW = Math.max(numLayout.width, denLayout.width) + 12;
-      const lineGap = 4;
+      const lineGap = Math.max(2, scaledSize * 0.11);
       const asc = numLayout.ascent + numLayout.descent + lineGap + 3;
       const desc = denLayout.ascent + denLayout.descent + lineGap + 3;
 
@@ -2141,11 +2427,17 @@ function buildLayout(
     case 'sqrt': {
       const contentScale = 0.85;
       const contentLayout = buildLayout(node.content, size * contentScale, actualConfig, style, paths, horizontalLines, textElements);
-      const hookW = 14;
+      
+      const degScale = 0.45;
+      const degLayout = node.degree ? buildLayout(node.degree, size * degScale, actualConfig, style, paths, horizontalLines, textElements) : null;
+      
+      const degW = degLayout ? degLayout.width : 0;
+      const hookW = Math.max(14, degW + 6);
       const gapRight = 4;
       const totalW = hookW + contentLayout.width + gapRight;
-      const extAsc = contentLayout.ascent + 5;
-      const desc = contentLayout.descent;
+      
+      const extAsc = Math.max(contentLayout.ascent + 5, degLayout ? (contentLayout.ascent + degLayout.ascent - 2) : 0);
+      const desc = contentLayout.descent + 3;
 
       return {
         width: totalW,
@@ -2153,30 +2445,52 @@ function buildLayout(
         descent: desc,
         render: (rx, ry) => {
           const topY = ry - contentLayout.ascent - 3;
-          const bottomY = ry + contentLayout.descent;
+          const bottomY = ry + contentLayout.descent + 3;
+          
+          // Render the content under root
           contentLayout.render(rx + hookW, ry);
 
+          // 1. Entrance tick
           horizontalLines.push({
-            x1: rx + hookW - 1,
+            x1: rx,
+            y1: ry - size * 0.12,
+            x2: rx + 3,
+            y2: ry - size * 0.12,
+            type: 'root'
+          });
+
+          // 2. Diagonal down to root bottom crook
+          horizontalLines.push({
+            x1: rx + 3,
+            y1: ry - size * 0.12,
+            x2: rx + 6,
+            y2: bottomY,
+            type: 'root'
+          });
+
+          // 3. Diagonal up from crook to roof start
+          horizontalLines.push({
+            x1: rx + 6,
+            y1: bottomY,
+            x2: rx + hookW - 2,
+            y2: topY,
+            type: 'root'
+          });
+
+          // 4. Roof roof horizontal bar covering content
+          horizontalLines.push({
+            x1: rx + hookW - 2,
             y1: topY,
             x2: rx + totalW,
             y2: topY,
             type: 'root'
           });
 
-          if (useFont) {
-            horizontalLines.push({ x1: rx + 2, y1: ry - 2, x2: rx + 5, y2: ry - 2, type: 'root' });
-            horizontalLines.push({ x1: rx + 5, y1: ry - 2, x2: rx + 8, y2: bottomY, type: 'root' });
-            horizontalLines.push({ x1: rx + 8, y1: bottomY, x2: rx + hookW - 1, y2: topY, type: 'root' });
-          } else {
-            const radicalRes = renderGlyphToSVGPath('\\sqrt', rx, ry - size*0.1, size*1.1, actualConfig, 0, 1, style);
-            if (radicalRes.pathData) {
-              paths.push({ d: radicalRes.pathData, type: 'root' });
-            } else {
-              horizontalLines.push({ x1: rx + 2, y1: ry - 2, x2: rx + 5, y2: ry - 2 });
-              horizontalLines.push({ x1: rx + 5, y1: ry - 2, x2: rx + 8, y2: bottomY });
-              horizontalLines.push({ x1: rx + 8, y1: bottomY, x2: rx + hookW - 1, y2: topY });
-            }
+          // Render root degree if present (e.g. \sqrt[3]{...} or \sqrt[99999]{...})
+          if (degLayout) {
+            const degX = rx + 2 + (hookW - 6 - degW) / 2;
+            const degY = ry - contentLayout.ascent * 0.25 - 2;
+            degLayout.render(degX, degY);
           }
         }
       };
@@ -2211,6 +2525,7 @@ function buildLayout(
 
     case 'bigOp': {
       const isSum = node.op === '\\sum';
+      const isInt = node.op === '\\int';
       const opScale = isSum ? 1.3 : 1.5;
       const opGlyphRes = renderGlyphToSVGPath(node.op, 0, 0, size * opScale, actualConfig, 0, 1, style);
       const opW = opGlyphRes.width;
@@ -2221,29 +2536,21 @@ function buildLayout(
       const supLayout = node.sup ? buildLayout(node.sup, size * limitScale, actualConfig, style, paths, horizontalLines, textElements) : null;
       const subLayout = node.sub ? buildLayout(node.sub, size * limitScale, actualConfig, style, paths, horizontalLines, textElements) : null;
 
-      let totalW = opW;
+      const limitW = Math.max(supLayout?.width || 0, subLayout?.width || 0);
+      const totalW = Math.max(opW, limitW) + 4;
       let asc = opAsc;
       let desc = opDesc;
 
-      if (isSum) {
-        const limitW = Math.max(supLayout?.width || 0, subLayout?.width || 0);
-        totalW = Math.max(opW, limitW) + 4;
-        if (supLayout) asc += supLayout.ascent + supLayout.descent + 3;
-        if (subLayout) desc += subLayout.ascent + subLayout.descent + 3;
-      } else {
-        const rightWidth = Math.max(supLayout?.width || 0, subLayout?.width || 0);
-        totalW = opW + rightWidth + 4;
-        if (supLayout) asc = Math.max(opAsc, opAsc + supLayout.ascent - 8);
-        if (subLayout) desc = Math.max(opDesc, opDesc + subLayout.descent - 4);
-      }
+      if (supLayout) asc += supLayout.ascent + supLayout.descent + 3;
+      if (subLayout) desc += subLayout.ascent + subLayout.descent + 3;
 
       return {
         width: totalW,
         ascent: asc,
         descent: desc,
         render: (rx, ry) => {
-          const opX = isSum ? rx + (totalW - opW) / 2 : rx;
-          const opY = isSum ? ry : ry + 5;
+          const opX = rx + (totalW - opW) / 2;
+          const opY = ry - size * opScale * 0.25;
 
           if (useFont) {
             const displayChar = REVERSE_ALIAS_MAP[node.op] || node.op;
@@ -2263,24 +2570,17 @@ function buildLayout(
             }
           }
 
-          if (isSum) {
-            if (supLayout) {
-              const supX = rx + (totalW - supLayout.width) / 2;
-              const supY = ry - opAsc - 4;
-              supLayout.render(supX, supY);
-            }
-            if (subLayout) {
-              const subX = rx + (totalW - subLayout.width) / 2;
-              const subY = ry + opDesc + subLayout.ascent + 2;
-              subLayout.render(subX, subY);
-            }
-          } else {
-            if (supLayout) {
-              supLayout.render(rx + opW - 2, ry - opAsc + 10);
-            }
-            if (subLayout) {
-              subLayout.render(rx + opW - 6, ry + opDesc + 2);
-            }
+          if (supLayout) {
+            const offset = isInt ? 4 : 0;
+            const supX = rx + (totalW - supLayout.width) / 2 + offset;
+            const supY = ry - opAsc - 4;
+            supLayout.render(supX, supY);
+          }
+          if (subLayout) {
+            const offset = isInt ? -2 : 0;
+            const subX = rx + (totalW - subLayout.width) / 2 + offset;
+            const subY = ry + opDesc + subLayout.ascent + 2;
+            subLayout.render(subX, subY);
           }
         }
       };
@@ -2333,7 +2633,10 @@ export function parseLaTeXFormula(
   const actualConfig = config ? { ...config, paperType: 'blank' as const, showMargins: false } : configPlaceholder;
 
   try {
-    const ast = parseLaTeXAST(expression);
+    const cleanExpr = expression
+      .replace(/\\left|\\right/g, ' ')
+      .replace(/\\,|\\!|\\:|\\;|\\ /g, ' ');
+    const ast = parseLaTeXAST(cleanExpr);
     const layout = buildLayout(ast, size, actualConfig, style, paths, horizontalLines, textElements);
     layout.render(startX, startY);
   } catch (err) {
@@ -2341,4 +2644,132 @@ export function parseLaTeXFormula(
   }
 
   return { paths, horizontalLines, textElements };
+}
+
+export function measureLaTeXFormula(
+  expression: string,
+  size: number,
+  config?: PageConfig,
+  style?: HandwritingStyle
+): number {
+  const configPlaceholder: PageConfig = {
+    paperType: 'blank',
+    fontFamily: 'sans',
+    inkColor: 'blue',
+    penStyle: 'gel',
+    lineSpacing: 28,
+    letterSpacing: 0,
+    wordSpacing: 10,
+    tiltVariance: 2,
+    spacingVariance: 0.5,
+    baselineVariance: 0.3,
+    strokeThickness: 1.5,
+    noiseLevel: 0.2,
+    margins: { top: 40, bottom: 40, left: 40, right: 40 },
+    showMargins: false,
+    curvedLines: false
+  };
+
+  const actualConfig = config ? { ...config, paperType: 'blank' as const, showMargins: false } : configPlaceholder;
+
+  try {
+    const cleanExpr = expression
+      .replace(/\\left|\\right/g, ' ')
+      .replace(/\\,|\\!|\\:|\\;|\\ /g, ' ');
+    const ast = parseLaTeXAST(cleanExpr);
+    const paths: any[] = [];
+    const horizontalLines: any[] = [];
+    const textElements: any[] = [];
+    const layout = buildLayout(ast, size, actualConfig, style, paths, horizontalLines, textElements);
+    return layout.width;
+  } catch (err) {
+    return 160;
+  }
+}
+
+export function preprocessUserTextMath(text: string): string {
+  if (!text) return '';
+
+  // 1. Normalize common AI formatting:
+  // Convert standard markdown fenced code blocks of type 'latex' or 'math' into $$ ... $$
+  text = text.replace(/```(?:latex|math)\n([\s\S]*?)\n```/gi, '\n$$ $1 $$\n');
+
+  // Convert \[ ... \] block formats to $$ ... $$ block formats
+  text = text.replace(/\\\[([\s\S]*?)\\\]/g, (match, formula) => {
+    const cleanFormula = formula.replace(/\s+/g, ' ').trim();
+    return `\n$$ ${cleanFormula} $$\n`;
+  });
+
+  // Compact any $$ ... $$ blocks (especially those spanning multiple lines) into a single line
+  text = text.replace(/\$\$([\s\S]*?)\$\$/g, (match, formula) => {
+    const cleanFormula = formula.replace(/\s+/g, ' ').trim();
+    return `$$ ${cleanFormula} $$`;
+  });
+
+  // 2. Map complex mathematical structures written inside inline formats to block format
+  const blockKeywords = [
+    '\\frac', '\\sum', '\\int', '\\sqrt', '\\lim', '\\matrix', '\\begin', '\\prod',
+    '\\Delta', '\\psi', '\\alpha', '\\beta', '\\gamma', '\\theta', '\\lambda',
+    '\\mu', '\\rho', '\\sigma', '\\phi', '\\omega'
+  ];
+
+  // Normalizing \( ... \)
+  text = text.replace(/\\\(([\s\S]*?)\\\)/g, (match, formula) => {
+    const fTrimmed = formula.trim();
+    const needsBlock = blockKeywords.some(kw => fTrimmed.includes(kw)) || fTrimmed.length > 25;
+    if (needsBlock) {
+      return `\n$$ ${fTrimmed} $$\n`;
+    } else {
+      return `$ ${fTrimmed} $`;
+    }
+  });
+
+  // Normalize single dollar inline math containing block keywords or extensive contents to full block
+  text = text.replace(/(?<!\$)\$([^$\n]+)\$(?!\$)/g, (match, formula) => {
+    const fTrimmed = formula.trim();
+    const needsBlock = blockKeywords.some(kw => fTrimmed.includes(kw)) || fTrimmed.length > 25;
+    if (needsBlock) {
+      return `\n$$ ${fTrimmed} $$\n`;
+    }
+    return `$ ${fTrimmed} $`;
+  });
+
+  // 3. For actual simple inline single-dollar formulae (like $x = 10$), simplify standard LaTeX symbols
+  // into their direct unicode characters so they render seamlessly inline using handwriting vector glyphs
+  const latexToUnicode: Record<string, string> = {
+    '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\Delta': 'Δ',
+    '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ', '\\rho': 'ρ', '\\sigma': 'σ',
+    '\\phi': 'φ', '\\psi': 'ψ', '\\omega': 'ω', '\\Omega': 'Ω',
+    '\\pi': 'π', '\\cdot': '·', '\\pm': '±', '\\times': '×', '\\div': '÷',
+    '\\approx': '≈', '\\ne': '≠', '\\le': '≤', '\\ge': '≥',
+    '\\degree': '°', '\\infty': '∞', '\\partial': '∂', '\\nabla': '∇',
+    '\\hbar': 'ħ', '\\to': '→', '\\rightarrow': '→'
+  };
+
+  text = text.replace(/(?<!\$)\$([^$\n]+)\$(?!\$)/g, (match, formula) => {
+    let result = formula;
+    Object.entries(latexToUnicode).forEach(([latex, unicode]) => {
+      const escaped = latex.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regex = new RegExp(escaped + '\\b', 'g');
+      result = result.replace(regex, unicode);
+    });
+    // Remove formatting backslashes
+    result = result.replace(/\\/g, '');
+    return result.trim();
+  });
+
+  // 4. Clean up spacing around double-dollars blocks
+  let lines = text.split('\n');
+  let cleanedLines: string[] = [];
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
+    const trimmed = line.trim();
+    if (trimmed.startsWith('$$') && trimmed.endsWith('$$')) {
+      cleanedLines.push(trimmed);
+    } else {
+      cleanedLines.push(line);
+    }
+  }
+
+  return cleanedLines.join('\n');
 }

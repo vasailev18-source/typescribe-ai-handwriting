@@ -1,5 +1,5 @@
 export type InkColor = 'blue' | 'black' | 'red' | 'purple' | 'green' | 'pink' | 'orange' | 'yellow' | 'brown' | 'grey' | 'pencil' | 'felt-blue' | 'felt-pink' | 'marker-yellow';
-export type ToolType = 'pen' | 'felt' | 'pencil' | 'colored-pencil' | 'marker';
+export type ToolType = 'pen' | 'felt' | 'pencil' | 'colored-pencil' | 'marker' | 'liner';
 export type PenStyle = 'ballpoint' | 'fountain' | 'gel';
 export type PaperType = 'blank' | 'lined' | 'squared';
 
@@ -16,6 +16,7 @@ export interface HandwritingStyle {
   useFont?: boolean;
   fontFamily?: string;
   fontUrl?: string; // custom base64 encoded TTF/OTF data URL or loaded Google Font name
+  isPrinted?: boolean;
 }
 
 export interface PageConfig {

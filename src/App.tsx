@@ -38,6 +38,15 @@ export const TOOL_META = {
     desc: '🖋️ Насыщенный чернильный стержень (шарик/перо) 0.5 - 1.0мм',
     colors: ['blue', 'black', 'purple', 'red', 'green', 'brown']
   },
+  liner: {
+    min: 0.3,
+    max: 1.8,
+    step: 0.05,
+    default: 0.7,
+    label: 'ТОЛЩИНА ЛИНЕРА',
+    desc: '🖋️ Капиллярный линер (Micron, Stabilo Point 88) с идеально постоянной толщиной линии под любым давлением.',
+    colors: ['black', 'blue', 'red', 'green', 'purple', 'brown']
+  },
   felt: {
     min: 2.0,
     max: 8.0,
@@ -89,6 +98,93 @@ export const PALETTE_COLORS = [
   { id: 'grey', hex: '#4d4f52', name: 'Графитовый', bgClass: 'bg-[#4d4f52]' },
 ] as const;
 
+export const REAL_LIFE_COLORS = {
+  pen_ballpoint: [
+    { id: 'bic-blue', name: 'Сиренево-синий Bic Cristal', hex: '#1e3d8f', comment: 'Классическая школьная ручка, масляный след, 90% плотности' },
+    { id: 'pilot-blue', name: 'Глубокий синий Pilot Super Grip', hex: '#192e70', comment: 'Насыщенный деловой синий под давлением' },
+    { id: 'ballpoint-schneider-blue', name: 'Небесно-синий Schneider Slider Basic', hex: '#2c59c5', comment: 'Мягкие немецкие чернила Viscoglide, чистый ясный оттенок' },
+    { id: 'ballpoint-linc-blue', name: 'Ярко-синий Linc Glycer', hex: '#204cd1', comment: 'Индийские супер-мягкие чернила пониженной вязкости' },
+    { id: 'ballpoint-black', name: 'Черный Bic Round Stic', hex: '#202022', comment: 'Мягкий масляный черный с легким графитовым отливом' },
+    { id: 'school-violet', name: 'Фиолетовый стержень ErichKrause', hex: '#5e2e85', comment: 'Знакомый фиолетовый цвет записей в детских тетрадях' },
+    { id: 'teacher-red', name: 'Красный коралловый Pilot', hex: '#9e1c1c', comment: 'Педагогический рубиново-красный для исправлений' },
+    { id: 'ballpoint-parker-red', name: 'Красный Parker Jotter Red', hex: '#c2272d', comment: 'Фирменный стержень с густой алой масляной пастой' },
+    { id: 'ballpoint-green', name: 'Зеленый Bic Ultra Round', hex: '#126b3c', comment: 'Ревизионный темно-зеленый оттенок для заметок' }
+  ],
+  pen_gel: [
+    { id: 'gel-black', name: 'Угольно-черный Crown Hi-Jell', hex: '#08080a', comment: 'Насыщенный гелевый уголь, сильный контраст с бумагой' },
+    { id: 'gel-muji-black', name: 'Матовый черный MUJI Gel Pen', hex: '#111214', comment: 'Минималистичные японские чернила, эталон графичности' },
+    { id: 'gel-indigo', name: 'Гелевый индиго ErichKrause Gel', hex: '#1a2c5e', comment: 'Темно-синий чернильный гель для важной документации' },
+    { id: 'gel-pentel-navy', name: 'Темно-синий Pentel EnerGel Navy', hex: '#14224c', comment: 'Мгновенно сохнущий глубокий благородный индиго' },
+    { id: 'gel-blue', name: 'Яркий синий Pensan Gel', hex: '#2252cc', comment: 'Насыщенный ультрамариновый гель с равномерным током' },
+    { id: 'gel-uniball-red', name: 'Алый Uni-ball Signo UM-151', hex: '#cf1b24', comment: 'Яркий водостойкий гелевый пигмент для черновиков' },
+    { id: 'gel-purple', name: 'Фиолетовый неоновый ErichKrause', hex: '#6c2ab3', comment: 'Яркий чернично-сиреневый след гелевой пасты' },
+    { id: 'gel-gold', name: 'Золотой металлик Crown Metallic', hex: '#bd9b31', comment: 'Золотистый гелевый пигмент с деликатным мерцанием' },
+    { id: 'gel-silver', name: 'Серебряный металлик Crown Metallic', hex: '#8a939e', comment: 'Серебристый акцентный гель для писем' }
+  ],
+  pen_fountain: [
+    { id: 'fountain-royal', name: 'Королевский синий Parker Quink', hex: '#1d388f', comment: 'Благородные перьевые чернила с эффектом затеняемости (shading)' },
+    { id: 'fountain-konpeki', name: 'Васильковый Pilot Iroshizuku Kon-peki', hex: '#297fd6', comment: 'Легендарные японские чернила цвета чистого южного неба' },
+    { id: 'fountain-blueblack', name: 'Сине-черный Lamy Blue-Black', hex: '#1b2c40', comment: 'Классические архивные чернила, уходящие в свинцовый серый' },
+    { id: 'fountain-aurora-black', name: 'Угольный Aurora Black', hex: '#0f0f10', comment: 'Густой глубочайший черный оттенок для перьевых ручек' },
+    { id: 'fountain-oxblood', name: 'Бордо Diamine Oxblood', hex: '#63131c', comment: 'Роскошный глубокий винный цвет с благородным градиентом' },
+    { id: 'fountain-sherwood', name: 'Шервудский зеленый Diamine Sherwood Green', hex: '#124823', comment: 'Бархатистый лесной зеленый с роскошными переходами тона' },
+    { id: 'fountain-emerald', name: 'Изумруд Graf von Faber-Castell', hex: '#105c3c', comment: 'Темно-зеленый оттенок вековых елей с пористым затеканием' },
+    { id: 'fountain-violet', name: 'Фиалковый Pelikan 4001 Violet', hex: '#551978', comment: 'Глубокий фиолетовый тон с красивым переливом плотности' },
+    { id: 'fountain-yamabudo', name: 'Яма-будо Pilot Iroshizuku', hex: '#8c1556', comment: 'Драгоценный японский пурпур дикого винограда' }
+  ],
+  liner: [
+    { id: 'liner-black-micron', name: 'Черный Sakura Pigma Micron 03', hex: '#0a0b0d', comment: 'Архивный капиллярный пигмент для чертежей и каллиграфии' },
+    { id: 'liner-blue-stabilo', name: 'Синий капиллярный Stabilo point 88', hex: '#1c459e', comment: 'Светло-синий ровный след со стальным наконечником' },
+    { id: 'liner-black-unipin', name: 'Черный Uni Pin Fine Line 0.5', hex: '#111112', comment: 'Плотный матовый водостойкий японский пигментный лайнер' },
+    { id: 'liner-green-micron', name: 'Зеленый Sakura Pigma Micron 05', hex: '#0f5230', comment: 'Насыщенный темно-изумрудный пигментный линер' },
+    { id: 'liner-brown-derwent', name: 'Коричневый линер Derwent Sepia', hex: '#5c3822', comment: 'Благородный матовый оттенок сепии для графических набросков' },
+    { id: 'liner-violet-stabilo', name: 'Фиолетовый Stabilo point 88', hex: '#581b9c', comment: 'Яркий чернично-сиреневый капиллярный цвет' }
+  ],
+  felt: [
+    { id: 'felt-black', name: 'Черный маркер Centropen 2511', hex: '#131314', comment: 'Плотный черный спиртовой пигмент классического фломастера' },
+    { id: 'felt-blue', name: 'Синий Koh-i-Noor художественный', hex: '#1b4bd1', comment: 'Сочный синий цвет детского фломастера' },
+    { id: 'felt-stabilo-emerald', name: 'Изумрудный Stabilo Pen 68 Emerald', hex: '#0d8560', comment: 'Сочный глубокий мятно-изумрудный пигмент' },
+    { id: 'felt-red', name: 'Яркий красный Centropen', hex: '#c91e1e', comment: 'Алая заправка для граффити и эскизов' },
+    { id: 'felt-green', name: 'Травянистый Koh-i-Noor', hex: '#138c43', comment: 'Глубокий салатово-зеленый оттенок фетрового грифеля' },
+    { id: 'felt-purple', name: 'Фиолетовый аметист Koh-i-Noor', hex: '#5a19ab', comment: 'Яркий насыщенный фиолетовый стержень' },
+    { id: 'felt-pink', name: 'Розовая маджента Centropen', hex: '#d92b67', comment: 'Неоновая розовая фуксия для эскизов и конспектов' },
+    { id: 'felt-sharpie-slate', name: 'Сланцево-серый Sharpie Fine Point', hex: '#4f5661', comment: 'Перманентный фломастер приглушенного оттенка мокрого камня' },
+    { id: 'felt-pitt-sanguine', name: 'Сангина Faber-Castell Pitt Artist', hex: '#b55431', comment: 'Художественная теплая терракота высокой светостойкости' },
+    { id: 'felt-brown', name: 'Коричневый древесный Сконто', hex: '#522f18', comment: 'Умеренно-коричневый землистый цвет' }
+  ],
+  pencil: [
+    { id: 'pencil-blackwing', name: 'Бархатный Palomino Blackwing Matte', hex: '#242528', comment: 'Культовый экстра-мягкий темный графит масляного скольжения' },
+    { id: 'pencil-2b', name: 'Мягкий Faber-Castell 9000 2B', hex: '#484a4f', comment: 'Бархатистый темный графит для выразительных штрихов' },
+    { id: 'pencil-rotring', name: 'Карандаш Rotring Tikky 0.5 HB', hex: '#65686e', comment: 'Металлическая жесткость стержня автоматического карандаша' },
+    { id: 'pencil-4b', name: 'Мягчайший Derwent Графит 4B', hex: '#2e3033', comment: 'Почти черный жирный отпечаток мягкого угля' },
+    { id: 'pencil-h', name: 'Чертежный Koh-i-Noor 1500 H', hex: '#85888d', comment: 'Чистый сухой бледно-серый оттенок для аккуратной разметки' },
+    { id: 'pencil-4h', name: 'Твердый Koh-i-Noor 1500 4H', hex: '#aaadb3', comment: 'Сухой и предельно светлый след для незаметных опорных линий' }
+  ],
+  'colored-pencil': [
+    { id: 'col-blue', name: 'Синий индиго Faber-Castell Polychromos', hex: '#1e44a3', comment: 'Синий художественный восковой карандаш высокой укрывистости' },
+    { id: 'col-prismacolor-indigo', name: 'Восковой индиго Prismacolor Premier', hex: '#1c2e5c', comment: 'Глубокий синий индиго с кремовым мягким нанесением' },
+    { id: 'col-green', name: "Изумрудно-зеленый Caran d'Ache Pablo", hex: '#116b34', comment: "Темно-зеленый восковой карандаш швейцарской серии" },
+    { id: 'col-polychromos-olive', name: 'Оливковая зелень Faber-Castell', hex: '#4f5c33', comment: 'Сдержанный благородный растительный оттенок вокса' },
+    { id: 'col-red', name: 'Карминовый красный Faber-Castell', hex: '#b51b1b', comment: 'Мягко ложащийся красный восковой грифель' },
+    { id: 'col-purple', name: 'Пурпурный Koh-i-Noor Polycolor', hex: '#611b93', comment: 'Насыщенный благородный пурпур за счет художественного воска' },
+    { id: 'col-yellow', name: 'Кадмий желтый Derwent Artists', hex: '#f5a611', comment: 'Мягкий кроющий солнечно-желтый восковой слой' },
+    { id: 'col-derwent-ochre', name: 'Охра Derwent Lightfast Ochre', hex: '#d19e41', comment: 'Теплая песочно-глиняная охра с бархатистой фактурой' },
+    { id: 'col-orange', name: 'Оранжевый хром Faber-Castell Polychromos', hex: '#e04e10', comment: 'Плотный восковой хром-оранжевый финиш' },
+    { id: 'col-pink', name: "Розовый фламинго Caran d'Ache Pablo", hex: '#cc215a', comment: "Красивый розовый матовый восковой финиш" },
+    { id: 'col-brown', name: "Жженая умбра Caran d'Ache", hex: '#633c24', comment: "Маслянистый природный темно-коричневый карандаш" }
+  ],
+  marker: [
+    { id: 'marker-yellow', name: 'Флуоресцентный Желтый Stabilo Boss', hex: '#eef022', comment: 'Светящийся кислотно-желтый пигмент, затекающий в бумагу' },
+    { id: 'marker-green', name: 'Пастельный Мятный Stabilo Pastel', hex: '#a3f7be', comment: 'Нежный расслабряющий мятный текстовыделитель' },
+    { id: 'marker-pink', name: 'Неоновый Розовый Milan Neon', hex: '#fca3ca', comment: 'Пронзительный конфетно-розовый маркерный след' },
+    { id: 'marker-stabilo-cherry', name: 'Пастельная вишня Stabilo Boss Cherry', hex: '#f0adb9', comment: 'Нежнейший зефирно-вишневый фон для акцентов в списках' },
+    { id: 'marker-turquoise', name: 'Бирюзовый Бриз Milan Pastel', hex: '#9bf0e7', comment: 'Пастельно-бирюзовый для мягкого контраста' },
+    { id: 'marker-orange', name: 'Абрикосовый неоновый Stabilo', hex: '#fcd1b1', comment: 'Светлый теплый абрикосовый маркер для эстетичных конспектов' },
+    { id: 'marker-lilac', name: 'Сиреневый Туман Milan Pastel', hex: '#dec0fa', comment: 'Пастельный лавандовый маркер для деликатного фонового выделения' },
+    { id: 'marker-zebra-gray', name: 'Приглушенный серый Zebra Mildliner Gray', hex: '#b0b5be', comment: 'Профессиональный мягкий серый хайлайтер для деликатных акцентов' },
+    { id: 'marker-pastel-lemon', name: 'Лимонный щербет Milan Pastel Lemon', hex: '#f9f2b3', comment: 'Деликатный бледно-лимонный цвет вместо резкого кислотного' }
+  ]
+};
 export const OFFICE_THEME_COLUMNS = [
   { name: 'Ч/Б', base: '#ffffff', shades: ['#ffffff', '#f2f2f2', '#d9d9d9', '#bfbfbf', '#a6a6a6', '#7f7f7f'] },
   { name: 'Текст', base: '#17171a', shades: ['#f3f4f6', '#e5e7eb', '#d1d5db', '#9ca3af', '#4b5563', '#111827'] },
@@ -525,6 +621,7 @@ export default function App() {
   // Custom Color Palette sub-tabs and picker state
   const [colorTab, setColorTab] = useState<'ink' | 'outline'>('ink');
   const [customHexInput, setCustomHexInput] = useState('');
+  const [showAdvancedColors, setShowAdvancedColors] = useState(false);
 
   // Sheet configuration state
   const [config, setConfig] = useState<PageConfig>({
@@ -605,21 +702,21 @@ export default function App() {
 4. Демонстрация продвинутых физико-математических формул:
 Вы можете вписывать сложные многоэтажные формулы LaTeX прямо на лист в формате двойных знаков доллара:
 
-$$ \int_{a}^{b} x^2 dx = \frac{b^3 - a^3}{3} $$
+$$ \\int_{a}^{b} x^2 dx = \\frac{b^3 - a^3}{3} $$
 
-$$ \sum_{n=1}^{\infty} \frac{\theta + \lambda}{\mu^2} $$
+$$ \\sum_{n=1}^{\\infty} \\frac{\\theta + \\lambda}{\\mu^2} $$
 
-$$ x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a} $$
+$$ x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a} $$
 
-$$ \psi(x, t) = \alpha \cdot e^{i(kx - \omega t)} $$
+$$ \\psi(x, t) = \\alpha \\cdot e^{i(kx - \\omega t)} $$
 
-$$ \Delta = e^2 + \frac{\alpha + \gamma}{\delta \cdot \sigma} $$
+$$ \\Delta = e^2 + \\frac{\\alpha + \\gamma}{\\delta \\cdot \\sigma} $$
 
-$$ \sin^2(\theta) + \cos^2(\theta) = 1 $$
+$$ \\sin^2(\\theta) + \\cos^2(\\theta) = 1 $$
 
-$$ \lim_{n \to \infty} \left(1 + \frac{1}{n}\right)^n = e $$
+$$ \\lim_{n \\to \\infty} \\left(1 + \\frac{1}{n}\\right)^n = e $$
 
-$$ \log_2(x) + \ln(y) = \tan(\phi) $$
+$$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
 
 Желаем продуктивной работы с Handwriting AI!`
   );
@@ -638,7 +735,8 @@ $$ \log_2(x) + \ln(y) = \tan(\phi) $$
     textInput + (showSignature && activeSignatureText ? `\n\n\n\n\n\n\n\n\n                                                   ${activeSignatureText}` : ''),
     config,
     activeStyle,
-    fontSize
+    fontSize,
+    styles
   );
 
   // Apply simulated Telegram Theme variables
@@ -653,9 +751,11 @@ $$ \log_2(x) + \ln(y) = \tan(\phi) $$
     setTextInput(prev => prev + `\n$$ ${template} $$`);
   };
 
-  const insertTableTemplate = (type: 'ruler' | 'handdrawn') => {
+  const insertTableTemplate = (type: 'ruler' | 'handdrawn' | 'printed') => {
     const template = type === 'ruler'
       ? `\n[table:ruler]\n| Товар | Кол-во | Цена |\n| Хлеб  | 1      | 50р  |\n| Молоко| 2      | 90р  |\n[endtable]\n`
+      : type === 'printed'
+      ? `\n[table:printed]\n| Товар | Кол-во | Цена |\n| Книга | 1      | 450р |\n| Ручка | 3      | 30р  |\n[endtable]\n`
       : `\n[table:handdrawn]\n| Товар | Кол-во | Цена |\n| Книга | 1      | 450р |\n| Ручка | 3      | 30р  |\n[endtable]\n`;
     setTextInput(prev => prev + template);
   };
@@ -996,6 +1096,27 @@ $$ \log_2(x) + \ln(y) = \tan(\phi) $$
                       >
                         Сумма
                       </button>
+                      <button
+                        onClick={() => insertLaTeXTemplate('\\frac{\\frac{a + b}{c}}{\\frac{d}{e}}')}
+                        className="bg-gray-50 border border-gray-200 hover:border-blue-500 text-[10.5px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer text-blue-600"
+                        title="Трехэтажная дробь"
+                      >
+                        3-этажная дробь
+                      </button>
+                      <button
+                        onClick={() => insertLaTeXTemplate('\\frac{\\frac{\\frac{a}{b}}{c}}{\\frac{d}{e}}')}
+                        className="bg-gray-50 border border-gray-200 hover:border-blue-500 text-[10.5px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer text-purple-600"
+                        title="Четырехэтажная дробь"
+                      >
+                        4-этажная дробь
+                      </button>
+                      <button
+                        onClick={() => insertLaTeXTemplate('\\sqrt[99999]{x^2 + y^2 + \\frac{\\alpha}{\\beta}}')}
+                        className="bg-gray-50 border border-gray-200 hover:border-blue-500 text-[10.5px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer text-emerald-600"
+                        title="Корень 99999 степени"
+                      >
+                        Корень 99999 ст.
+                      </button>
                     </div>
                   </div>
 
@@ -1017,6 +1138,54 @@ $$ \log_2(x) + \ln(y) = \tan(\phi) $$
                         className="bg-orange-50 hover:bg-orange-100 border border-orange-200 hover:border-orange-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-orange-700 transition-all cursor-pointer flex items-center gap-1"
                       >
                         <span>✍️ Слегка неровно от руки</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Print & Form Field Templates */}
+                  <div className="mt-4 pt-3 border-t border-gray-100">
+                    <span className="text-[10px] uppercase font-bold text-gray-400 block mb-2 tracking-wider flex items-center gap-1">
+                      <Settings2 size={11} className="text-emerald-600" />
+                      Печатная разметка и Бланки
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        onClick={() => insertTableTemplate('printed')}
+                        className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-emerald-700 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>🖨️ Печатная таблица</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTextInput(prev => prev + `\n[line:200:ФИО] [style:neat-school]Иванов Иван Иванович[/style] [/line]\n[line:100:Дата] [style:neat-school]25.05.2026[/style] [/line] [line:100:Подпись]             [/line]`);
+                        }}
+                        className="bg-teal-50 hover:bg-teal-100 border border-teal-200 hover:border-teal-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-teal-700 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>➖ Строка бланка (ФИО, Дата)</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTextInput(prev => prev + `\n[print]Печатный текст Serif (Times New Roman)[/print]`);
+                        }}
+                        className="bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-gray-700 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>📜 Печатный Serif</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTextInput(prev => prev + `\n[print:sans]Печатный текст Sans (Inter/Arial)[/print]`);
+                        }}
+                        className="bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-gray-700 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>📄 Печатный Sans</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTextInput(prev => prev + `\n[print:mono]Печатная машинка (Courier)[/print]`);
+                        }}
+                        className="bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-gray-700 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>📟 Машинка (Mono)</span>
                       </button>
                     </div>
                   </div>
@@ -1046,30 +1215,57 @@ $$ \log_2(x) + \ln(y) = \tan(\phi) $$
                     </div>
 
                     <div>
-                      <label className="text-[10px] sm:text-[11px] font-bold text-gray-400 block mb-1">ИНСТРУМЕНТ</label>
+                      <label className="text-[10px] sm:text-[11px] font-bold text-gray-400 block mb-1">ИНСТРУМЕНТ И СТИЛЬ ПИСЬМА</label>
                       <select
-                        value={config.toolType || 'pen'}
+                        value={
+                          config.toolType === 'pen' || !config.toolType
+                            ? `pen_${config.penStyle || 'gel'}`
+                            : config.toolType
+                        }
                         onChange={(e) => {
-                          const newTool = e.target.value as any;
-                          const meta = TOOL_META[newTool as keyof typeof TOOL_META] || TOOL_META.pen;
-                          let newColor = config.inkColor;
-                          if (!(meta.colors as readonly string[]).includes(newColor)) {
-                            newColor = meta.colors[0] as typeof config.inkColor;
+                          const val = e.target.value;
+                          let newTool: 'pen' | 'felt' | 'pencil' | 'colored-pencil' | 'marker' = 'pen';
+                          let newStyle: 'ballpoint' | 'fountain' | 'gel' = 'gel';
+                          
+                          if (val.startsWith('pen_')) {
+                            newTool = 'pen';
+                            newStyle = val.replace('pen_', '') as any;
+                          } else {
+                            newTool = val as any;
                           }
-                          setConfig({ 
-                            ...config, 
+                          
+                          // Look up corresponding thickness default value
+                          const thicknessDefault = {
+                            pen_ballpoint: 1.1,
+                            pen_gel: 1.4,
+                            pen_fountain: 1.6,
+                            felt: 4.5,
+                            pencil: 1.1,
+                            'colored-pencil': 1.5,
+                            marker: 15.0
+                          }[val] || 1.3;
+
+                          // Retrieve default ink hex for newly chosen tool
+                          const activeColorList = REAL_LIFE_COLORS[val as keyof typeof REAL_LIFE_COLORS] || REAL_LIFE_COLORS.pen_ballpoint;
+                          const newColor = activeColorList[0].hex;
+
+                          setConfig({
+                            ...config,
                             toolType: newTool,
-                            inkColor: newColor,
-                            strokeThickness: meta.default
+                            penStyle: newStyle,
+                            strokeThickness: thicknessDefault,
+                            inkColor: newColor
                           });
                         }}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs font-bold text-blue-600 border-blue-100"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs font-bold text-blue-600 border-blue-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       >
-                        <option value="pen">🖋️ Ручка / Перо</option>
-                        <option value="felt">🖍️ Фломастер</option>
-                        <option value="pencil">✏️ Простой карандаш</option>
-                        <option value="colored-pencil">🎨 Цветной карандаш</option>
-                        <option value="marker">⚡ Текстовыделитель</option>
+                        <option value="pen_ballpoint">🖋️ Шариковая ручка (Bic, Pilot)</option>
+                        <option value="pen_gel">🧪 Гелевая ручка (Crown, ErichKrause)</option>
+                        <option value="pen_fountain">✒️ Перьевая ручка (Parker, Lamy)</option>
+                        <option value="felt">🖍️ Фломастер (Centropen, Koh-i-Noor)</option>
+                        <option value="pencil">✏️ Простой карандаш (Твердости HB, 2B, H)</option>
+                        <option value="colored-pencil">🎨 Цветной карандаш (Faber-Castell)</option>
+                        <option value="marker">⚡ Текстовыделитель (Stabilo Boss)</option>
                       </select>
                     </div>
 
@@ -1090,10 +1286,14 @@ $$ \log_2(x) + \ln(y) = \tan(\phi) $$
                   {/* Office-Style Segmented Tab for Ink vs Text Outline */}
                   <div className="pt-3.5 border-t border-gray-100 flex flex-col gap-2.5">
                     <div className="flex justify-between items-center mb-1">
-                      <label className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-wider">Палитра цветов (Office-style)</label>
-                      <span className="text-xs font-bold text-gray-700 bg-gray-50 px-2.5 py-0.5 rounded border border-gray-100">
+                      <label className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-wider">Палитра цветов и стержней</label>
+                      <span className="text-xs font-bold text-gray-700 bg-gray-50 px-2.5 py-0.5 rounded border border-gray-100 truncate max-w-[200px]" title={config.inkColor}>
                         {colorTab === 'ink'
-                          ? `Чернила: ${PALETTE_COLORS.find(c => c.id === config.inkColor)?.name || config.inkColor}`
+                          ? `След: ${
+                              Object.values(REAL_LIFE_COLORS).flat().find(c => c.hex === config.inkColor)?.name || 
+                              PALETTE_COLORS.find(c => c.id === config.inkColor)?.name || 
+                              config.inkColor
+                            }`
                           : `Окантовка: ${config.textOutlineColor || 'Без окантовки'}`}
                       </span>
                     </div>
@@ -1109,7 +1309,7 @@ $$ \log_2(x) + \ln(y) = \tan(\phi) $$
                             : 'text-gray-500 hover:text-gray-700'
                         }`}
                       >
-                        🖋️ Цвет чернил
+                        🖋️ Цвет чернил / грифеля
                       </button>
                       <button
                         type="button"
@@ -1124,15 +1324,66 @@ $$ \log_2(x) + \ln(y) = \tan(\phi) $$
                       </button>
                     </div>
 
-                    {/* Description for active tab constraints */}
-                    {colorTab === 'ink' && config.toolType === 'pencil' && (
-                      <div className="text-[10px] text-gray-500 bg-gray-50 p-2 rounded-lg border border-gray-100">
-                        ✏️ Для графитового карандаша цвета ограничены шкалой серых оттенков.
+                    {/* Realistic Ink Selection Grid (for Ink Tab) */}
+                    {colorTab === 'ink' && (
+                      <div className="flex flex-col gap-2 bg-white p-3 rounded-xl border border-gray-150 shadow-sm">
+                        <div className="flex flex-col mb-1.5 animate-fadeIn">
+                          <span className="text-[9.5px] font-black text-blue-600 tracking-wider uppercase mb-0.5">🎨 Аутентичные чернила из реальной жизни</span>
+                          <span className="text-[9px] text-gray-400 leading-tight">Профессиональные пигменты и графиты мировых канцелярских брендов</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {(() => {
+                            const activeToolKey = config.toolType === 'pen' || !config.toolType
+                              ? `pen_${config.penStyle || 'gel'}`
+                              : config.toolType;
+                            const activeColors = REAL_LIFE_COLORS[activeToolKey as keyof typeof REAL_LIFE_COLORS] || REAL_LIFE_COLORS.pen_ballpoint;
+                            
+                            return activeColors.map((colorItem) => {
+                              const isSelected = config.inkColor === colorItem.hex;
+                              return (
+                                <button
+                                  key={colorItem.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setConfig({ ...config, inkColor: colorItem.hex });
+                                  }}
+                                  className={`flex items-center gap-2 p-1.5 rounded-lg border text-left transition-all hover:bg-gray-50 cursor-pointer ${
+                                    isSelected 
+                                      ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-400/30 font-semibold' 
+                                      : 'border-gray-150 bg-white'
+                                  }`}
+                                >
+                                  {/* Glossy color drop */}
+                                  <div className="relative w-5 h-5 rounded-full border border-black/10 shadow-sm flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: colorItem.hex }}>
+                                    <div className="absolute top-0.5 left-0.5 w-1.5 h-1.5 rounded-full bg-white/45 pointer-events-none" />
+                                    {isSelected && (
+                                      <span className="w-1.5 h-1.5 rounded-full bg-white shadow-sm invert" />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0 flex-1 leading-tight">
+                                    <div className="text-[10px] font-extrabold text-gray-800 truncate">{colorItem.name}</div>
+                                    <div className="text-[8.5px] text-gray-400 truncate leading-none">{colorItem.comment}</div>
+                                  </div>
+                                </button>
+                              );
+                            });
+                          })()}
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={() => setShowAdvancedColors(!showAdvancedColors)}
+                          className="text-[9.5px] font-bold text-gray-400 hover:text-blue-500 transition-all flex items-center justify-center gap-1 mt-1 pt-1.5 border-t border-gray-100 cursor-pointer"
+                        >
+                          {showAdvancedColors ? '▲ Скрыть расширенную Office-палитру' : '▼ Показать полную палитру цветов и оттенков'}
+                        </button>
                       </div>
                     )}
 
-                    {/* Office Grid Display */}
-                    <div className="flex flex-col gap-2.5 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+                    {/* Office Grid Display Header */}
+                    {((colorTab === 'outline') || (colorTab === 'ink' && showAdvancedColors)) && (
+                      <div className="flex flex-col gap-2.5 bg-gray-50/50 p-3 rounded-xl border border-gray-100 animate-fadeIn">
                       
                       {/* Theme Colors Matrix (10 Columns, 6 Rows of Shades) */}
                       <div className="flex flex-col gap-1">
@@ -1287,9 +1538,9 @@ $$ \log_2(x) + \ln(y) = \tan(\phi) $$
                           <span>Сбросить</span>
                         </button>
                       </div>
-
                     </div>
-                  </div>
+                  )}
+                </div>
 
                   {/* Dynamic Font Size Adjustment Slider + Quick Actions */}
                   <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
