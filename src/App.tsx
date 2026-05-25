@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { PageConfig, HandwritingStyle } from './types';
+import React, { useState, useEffect } from 'react';
+import { PageConfig, HandwritingStyle, Drawing, ToolType, InkColor } from './types';
 import { wrapTextIntoPages, RenderedPage } from './utils/handwritingEngine';
 import A4Paper from './components/A4Paper';
 import StyleStudio from './components/StyleStudio';
@@ -727,6 +727,204 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
   const [newSigName, setNewSigName] = useState<string>('');
   const [newSigText, setNewSigText] = useState<string>('');
 
+  const [drawings, setDrawings] = useState<Record<string, Drawing>>({
+    'drawing-default-cone': {
+      id: 'drawing-default-cone',
+      name: 'Конус (Геометрия)',
+      templateId: 'cone',
+      renderMode: 'handdrawn',
+      similarity: 2,
+      toolType: 'pencil',
+      inkColor: 'grey',
+      width: 150,
+      height: 150
+    },
+    'drawing-default-flower': {
+      id: 'drawing-default-flower',
+      name: 'Цветок ромашка',
+      templateId: 'flower',
+      renderMode: 'handdrawn',
+      similarity: 2,
+      toolType: 'pen',
+      inkColor: 'blue',
+      width: 140,
+      height: 140
+    },
+    'drawing-default-cat': {
+      id: 'drawing-default-cat',
+      name: 'Котёнок',
+      templateId: 'cat',
+      renderMode: 'handdrawn',
+      similarity: 3,
+      toolType: 'pencil',
+      inkColor: 'grey',
+      width: 150,
+      height: 150
+    }
+  });
+
+  const [activeDrawing, setActiveDrawing] = useState<Drawing>({
+    id: 'drawing-active',
+    name: 'Чертеж конуса',
+    templateId: 'cone',
+    renderMode: 'handdrawn',
+    similarity: 2,
+    toolType: 'pencil',
+    inkColor: 'grey',
+    width: 150,
+    height: 150
+  });
+
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isProcessingUpload, setIsProcessingUpload] = useState<boolean>(false);
+
+  const handleDrawingFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError(null);
+    setIsProcessingUpload(true);
+    
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Пожалуйста, выберите файл изображения (png/jpg/jpeg/svg)');
+      setIsProcessingUpload(false);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          setUploadError('Не удалось создать canvas');
+          setIsProcessingUpload(false);
+          return;
+        }
+
+        const maxDim = 120;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        
+        const imgData = ctx.getImageData(0, 0, w, h);
+        const pixelData = imgData.data;
+
+        const grid: boolean[][] = Array.from({ length: h }, () => Array(w).fill(false));
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const idx = (y * w + x) * 4;
+            const r = pixelData[idx];
+            const g = pixelData[idx+1];
+            const b = pixelData[idx+2];
+            const a = pixelData[idx+3];
+            const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (a > 50 && brightness < 150) {
+              grid[y][x] = true;
+            }
+          }
+        }
+
+        const visited: boolean[][] = Array.from({ length: h }, () => Array(w).fill(false));
+        const extractedPaths: Array<Array<[number, number]>> = [];
+        const maxDist = 3.8;
+
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            if (grid[y][x] && !visited[y][x]) {
+              const currentPath: Array<[number, number]> = [];
+              let cx = x;
+              let cy = y;
+              currentPath.push([Math.round((cx / w) * 100), Math.round((cy / h) * 100)]);
+              visited[cy][cx] = true;
+
+              let tracing = true;
+              while (tracing) {
+                let nextPt: [number, number] | null = null;
+                let minDist = Infinity;
+                
+                const searchRad = 4;
+                for (let ny = Math.max(0, cy - searchRad); ny < Math.min(h, cy + searchRad + 1); ny++) {
+                  for (let nx = Math.max(0, cx - searchRad); nx < Math.min(w, cx + searchRad + 1); nx++) {
+                    if (grid[ny][nx] && !visited[ny][nx]) {
+                      const dist = Math.sqrt((nx - cx)*(nx - cx) + (ny - cy)*(ny - cy));
+                      if (dist < minDist && dist <= maxDist) {
+                        minDist = dist;
+                        nextPt = [nx, ny];
+                      }
+                    }
+                  }
+                }
+
+                if (nextPt) {
+                  cx = nextPt[0];
+                  cy = nextPt[1];
+                  currentPath.push([Math.round((cx / w) * 100), Math.round((cy / h) * 100)]);
+                  visited[cy][cx] = true;
+                } else {
+                  tracing = false;
+                }
+              }
+
+              if (currentPath.length >= 3) {
+                extractedPaths.push(currentPath);
+              }
+            }
+          }
+        }
+
+        const newD: Drawing = {
+          id: `drawing-uploaded-${Date.now()}`,
+          name: file.name.substring(0, 20) || 'Загруженный рисунок',
+          templateId: 'custom',
+          renderMode: 'handdrawn',
+          similarity: 2,
+          toolType: 'pencil',
+          inkColor: 'grey',
+          width: 160,
+          height: 160,
+          url: dataUrl,
+          paths: extractedPaths
+        };
+        setActiveDrawing(newD);
+        setIsProcessingUpload(false);
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const insertDrawingIntoText = () => {
+    const finalId = activeDrawing.id === 'drawing-active' || activeDrawing.id.startsWith('drawing-uploaded-')
+      ? `drawing-user-${Date.now()}`
+      : activeDrawing.id;
+
+    setDrawings(prev => ({
+      ...prev,
+      [finalId]: {
+        ...activeDrawing,
+        id: finalId
+      }
+    }));
+
+    setTextInput(prev => prev + `\n[drawing:${finalId}]\n`);
+  };
+
   // Get active signature text
   const activeSignatureText = activeSignature ? activeSignature.signature : '';
 
@@ -736,7 +934,8 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
     config,
     activeStyle,
     fontSize,
-    styles
+    styles,
+    drawings
   );
 
   // Apply simulated Telegram Theme variables
@@ -1189,6 +1388,330 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
                       </button>
                     </div>
                   </div>
+                </div>
+
+                {/* Image/Drawing Insertion Panel */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex flex-col gap-4">
+                  <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest block flex items-center gap-1.5">
+                      🖼️ Вставка рисунка / Иллюстрации
+                    </span>
+                    <span className="text-[10px] bg-blue-50 text-blue-600 font-extrabold px-2 py-0.5 rounded-full uppercase">
+                      Новое
+                    </span>
+                  </div>
+
+                  {/* Template Selection or Upload Toggle */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Выбор источника</label>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveDrawing(prev => ({
+                            ...prev,
+                            templateId: 'cone',
+                            name: 'Конус (Геометрия)',
+                            url: undefined
+                          }));
+                        }}
+                        className={`py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
+                          activeDrawing.templateId !== 'custom' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        Шаблоны
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveDrawing(prev => ({
+                            ...prev,
+                            templateId: 'custom',
+                            name: 'Загруженный рисунок'
+                          }));
+                        }}
+                        className={`py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all ${
+                          activeDrawing.templateId === 'custom' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        Загрузить файл
+                      </button>
+                    </div>
+                  </div>
+
+                  {activeDrawing.templateId !== 'custom' ? (
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Векторные фигуры</label>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          { id: 'cone', label: '📐 Конус', name: 'Конус (Геометрия)' },
+                          { id: 'flower', label: '🌸 Ромашка', name: 'Цветок ромашка' },
+                          { id: 'heart', label: '❤️ Сердце', name: 'Сердце' },
+                          { id: 'house', label: '🏠 Домик', name: 'Домик' },
+                          { id: 'wave', label: '📈 Синус', name: 'График-синусоида' },
+                          { id: 'cat', label: '🐱 Котёнок', name: 'Котёнок' },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setActiveDrawing(prev => ({
+                                ...prev,
+                                templateId: item.id as any,
+                                name: item.name
+                              }));
+                            }}
+                            className={`py-1.5 text-[11px] font-bold px-2 rounded-lg border text-center transition-all cursor-pointer ${
+                              activeDrawing.templateId === item.id 
+                                ? 'bg-blue-50 border-blue-200 text-blue-600' 
+                                : 'bg-slate-50 hover:bg-slate-100 border-slate-100 hover:border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Файл рисунка</label>
+                      
+                      {activeDrawing.url ? (
+                        <div className="flex items-center gap-3 bg-slate-50 p-2 border border-slate-100 rounded-xl relative">
+                          <img
+                            src={activeDrawing.url}
+                            alt="Uploaded preview"
+                            className="w-12 h-12 rounded-lg object-contain bg-white border border-slate-200"
+                          />
+                          <div className="flex-1 overflow-hidden">
+                            <p className="text-xs font-bold text-slate-700 truncate">{activeDrawing.name}</p>
+                            <p className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
+                              ✓ {activeDrawing.paths ? `${activeDrawing.paths.length} штрихов векторизовано` : 'Готов'}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setActiveDrawing(prev => ({ ...prev, url: undefined, paths: undefined }));
+                            }}
+                            className="text-red-500 hover:text-red-600 p-1 text-xs font-bold pr-2 cursor-pointer"
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center hover:border-blue-400 hover:bg-slate-50/50 transition-all relative">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleDrawingFileUpload}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                          {isProcessingUpload ? (
+                            <div className="flex flex-col items-center gap-1.5 justify-center">
+                              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                              <span className="text-[11px] font-bold text-slate-500">Векторизуем рисунок...</span>
+                            </div>
+                          ) : (
+                            <div>
+                              <p className="text-xs font-bold text-slate-700">Загрузить контурный рисунок</p>
+                              <p className="text-[9px] text-slate-400 mt-1 font-semibold">Перетащите сюда или нажмите для выбора</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {uploadError && (
+                        <p className="text-[10px] text-rose-500 font-semibold">{uploadError}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Rendering Mode Selector */}
+                  <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-50">
+                    <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Вариант вставки</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveDrawing(prev => ({ ...prev, renderMode: 'original' }));
+                        }}
+                        disabled={activeDrawing.templateId === 'custom' && !activeDrawing.url}
+                        className={`py-1.5 px-3 rounded-lg border text-xs font-bold text-center cursor-pointer transition-all ${
+                          activeDrawing.renderMode === 'original'
+                            ? 'bg-blue-50 border-blue-200 text-blue-600'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-100 text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed'
+                        }`}
+                      >
+                        1. Точно как вставили
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveDrawing(prev => ({ ...prev, renderMode: 'handdrawn' }));
+                        }}
+                        className={`py-1.5 px-3 rounded-lg border text-xs font-bold text-center cursor-pointer transition-all ${
+                          activeDrawing.renderMode === 'handdrawn'
+                            ? 'bg-blue-50 border-blue-200 text-blue-600'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-100 text-slate-600'
+                        }`}
+                      >
+                        2. Рукописная копия
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Similarity / Skill Level Slider */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">
+                        Точность и дрожь рук (Сходство)
+                      </label>
+                      <span className="text-[11px] font-bold text-blue-600">
+                        {
+                          activeDrawing.similarity === 1 ? 'Один в один' :
+                          activeDrawing.similarity === 2 ? 'Похоже' :
+                          activeDrawing.similarity === 3 ? 'С дрожанием рук' :
+                          activeDrawing.similarity === 4 ? 'Сильное дрожание' :
+                          'Плохой художник'
+                        }
+                      </span>
+                    </div>
+                    
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      step="1"
+                      value={activeDrawing.similarity}
+                      onChange={(e) => {
+                        setActiveDrawing(prev => ({
+                          ...prev,
+                          similarity: parseInt(e.target.value)
+                        }));
+                      }}
+                      className="w-full accent-blue-600"
+                    />
+                    
+                    <div className="flex justify-between text-[9px] text-slate-400 px-0.5 font-bold uppercase tracking-wider">
+                      <span>Идеал</span>
+                      <span>Обычный</span>
+                      <span>Тряска</span>
+                      <span>Слабый художник</span>
+                    </div>
+                  </div>
+
+                  {/* Customization variables for Handdrawn style */}
+                  {activeDrawing.renderMode === 'handdrawn' && (
+                    <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-100/90 flex flex-col gap-3">
+                      <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest border-b border-dashed border-slate-100 pb-1">
+                        Настройки чернильного инструмента
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Инструмент</label>
+                          <select
+                            value={activeDrawing.toolType}
+                            onChange={(e) => {
+                              const toolVal = e.target.value as ToolType;
+                              setActiveDrawing(prev => ({
+                                ...prev,
+                                toolType: toolVal,
+                                inkColor: toolVal === 'pencil' ? 'grey' : prev.inkColor === 'grey' ? 'blue' : prev.inkColor
+                              }));
+                            }}
+                            className="w-full bg-white border border-gray-200 rounded-lg p-1.5 text-[11px] font-bold"
+                          >
+                            <option value="pencil">✏️ Простой карандаш</option>
+                            <option value="colored-pencil">🎨 Цветной карандаш</option>
+                            <option value="pen">🖋️ Обычная ручка</option>
+                            <option value="liner">🖍️ Капиллярный лайнер</option>
+                            <option value="felt">🖍 Фломастер</option>
+                            <option value="marker">⚡ Скошенный маркер</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Цвет стержня</label>
+                          <select
+                            value={activeDrawing.inkColor}
+                            onChange={(e) => {
+                              setActiveDrawing(prev => ({
+                                ...prev,
+                                inkColor: e.target.value as any
+                              }));
+                            }}
+                            className="w-full bg-white border border-gray-200 rounded-lg p-1.5 text-[11px] font-bold"
+                          >
+                            <option value="original">Цвет текста листа</option>
+                            <option value="grey">🔘 Серый графит</option>
+                            <option value="blue">🔵 Синяя паста</option>
+                            <option value="black">⚫️ Черная тушь</option>
+                            <option value="red">🔴 Красный</option>
+                            <option value="purple">🟣 Фиолетовый</option>
+                            <option value="green">🟢 Зеленый</option>
+                            <option value="brown">🤎 Коричневый</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Size adjustments inside card */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1">
+                        <span>ШИРИНА</span>
+                        <span className="text-slate-700">{activeDrawing.width}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="80"
+                        max="350"
+                        step="10"
+                        value={activeDrawing.width}
+                        onChange={(e) => {
+                          const wVal = parseInt(e.target.value);
+                          setActiveDrawing(prev => ({
+                            ...prev,
+                            width: wVal,
+                            height: prev.templateId === 'custom' ? prev.height : wVal
+                          }));
+                        }}
+                        className="w-full accent-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[10px] font-bold text-gray-400 mb-1">
+                        <span>ВЫСОТА</span>
+                        <span className="text-slate-700">{activeDrawing.height}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="80"
+                        max="350"
+                        step="10"
+                        value={activeDrawing.height}
+                        onChange={(e) => {
+                          setActiveDrawing(prev => ({
+                            ...prev,
+                            height: parseInt(e.target.value)
+                          }));
+                        }}
+                        className="w-full accent-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Insert Action Trigger Button */}
+                  <button
+                    type="button"
+                    onClick={insertDrawingIntoText}
+                    disabled={activeDrawing.templateId === 'custom' && !activeDrawing.url}
+                    className="w-full mt-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md shadow-blue-100 hover:shadow-lg disabled:shadow-none"
+                  >
+                    <span>➕ Добавить рисунок в текст</span>
+                  </button>
                 </div>
 
                 {/* Margins & Sizing Adjusters */}

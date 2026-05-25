@@ -71,3 +71,18 @@ export interface TelegramTheme {
   button_color?: string;
   button_text_color?: string;
 }
+
+export interface Drawing {
+  id: string;
+  name: string;
+  templateId: 'custom' | 'cone' | 'flower' | 'heart' | 'house' | 'wave' | 'cat';
+  renderMode: 'original' | 'handdrawn';
+  similarity: number; // 1 = Одна в один (exact), 2 = Похоже, 3 = Дрожание рук, 4 = Сильное дрожание, 5 = Плохой художник
+  toolType: ToolType;
+  inkColor: InkColor | 'original';
+  width: number;
+  height: number;
+  url?: string;
+  paths?: Array<Array<[number, number]>>;
+}
+

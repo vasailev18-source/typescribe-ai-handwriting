@@ -1,4 +1,4 @@
-import { PageConfig, HandwritingStyle } from '../types';
+import { PageConfig, HandwritingStyle, Drawing } from '../types';
 
 // Let's create a procedural representation of strokes for characters.
 // Each character is defined as a series of strokes (array of coordinate points [x, y] on a 0-100 grid).
@@ -867,7 +867,10 @@ export function getUnitBaseWidth(unit: string, useFont?: boolean, fontFamily?: s
     const isNarrow = char === 'i' || char === 'l' || char === 'j' || char === 't' || char === 'f' ||
                       char === '!' || char === ';' || char === ':' || char === '.' || char === ',' || 
                       char === '1' || char === 'r' || char === 'г' || char === 'ь' || char === 'і' || char === 'ї' ||
-                      char === ' ' || char === '(' || char === ')' || char === '/' || char === '\\' || char === '-';
+                      char === ' ' || char === '/' || char === '\\' || char === '-';
+
+    const isBracket = char === '(' || char === ')' || char === '[' || char === ']' || char === '{' || char === '}';
+    if (isBracket) return useFont ? 11 : 12;
 
     // Letters that are extra wide (need much more space to prevent overlap)
     const isExtraWide = char === 'm' || char === 'w' || char === 'M' || char === 'W' || 
@@ -1128,7 +1131,12 @@ export function renderGlyphToSVGPath(
   nextUnit?: string
 ): { pathData: string; width: number; firstPoint: [number, number]; lastPoint: [number, number]; useFont?: boolean; rotation?: number } {
   // If style uses a real font-family instead of procedural SVG strokes
-  if (style?.useFont) {
+  const isSpecialMath = char.startsWith('\\') || [
+    'α', 'β', 'γ', 'δ', 'Δ', 'θ', 'λ', 'μ', 'ρ', 'σ', 'φ', 'ψ', 'ω', 'Ω', '∫', '∑', '∏', '√', '∞',
+    '°', '±', '×', '÷', '≈', '≠', '≤', '≥', '∂', '∇', 'ħ', 'π', '·', '→', 'Σ'
+  ].includes(char);
+
+  if (style?.useFont && !isSpecialMath) {
     const baseWidth = getUnitBaseWidth(char, true, style?.fontFamily);
     const baseLetterSpacing = style ? style.letterSpacing : 0;
     const localSpacingOffset = config.spacingVariance * Math.cos(charIndex * 2.1 + lineIndex * 0.7);
@@ -1550,12 +1558,14 @@ export interface RenderedPage {
   lines: Array<{
     y: number;
     elements: Array<{
-      type: 'text' | 'latex' | 'table' | 'form_line';
+      type: 'text' | 'latex' | 'table' | 'form_line' | 'drawing';
       pathData?: string;
       char?: string;
       x: number;
       y: number;
       width: number;
+      height?: number;
+      drawing?: Drawing;
       latexExpression?: string; // for rendering formulas in SVG
       useFont?: boolean;
       fontFamily?: string;
@@ -1584,7 +1594,8 @@ export function wrapTextIntoPages(
   config: PageConfig,
   style?: HandwritingStyle,
   fontSize: number = 24,
-  availableStyles: HandwritingStyle[] = []
+  availableStyles: HandwritingStyle[] = [],
+  drawings?: Record<string, Drawing>
 ): Array<RenderedPage> {
   const processedText = preprocessUserTextMath(text);
   const pages: Array<RenderedPage> = [];
@@ -1781,6 +1792,39 @@ export function wrapTextIntoPages(
     const originalLine = lines[i];
     const trimmed = originalLine.trim();
 
+    // Check if line is a drawing specifier
+    if (trimmed.startsWith('[drawing:') && trimmed.endsWith(']')) {
+      const drawingId = trimmed.slice(9, -1).trim();
+      const drawing = drawings ? drawings[drawingId] : null;
+      if (drawing) {
+        const drawingHeight = drawing.height || 180;
+        
+        // Page break check
+        if (currentY + drawingHeight > PAGE_HEIGHT - config.margins.bottom && currentPageLines.length > 0) {
+          pages.push({ lines: currentPageLines });
+          currentPageLines = [];
+          currentY = config.margins.top;
+        }
+
+        currentPageLines.push({
+          y: currentY,
+          elements: [{
+            type: 'drawing',
+            x: config.margins.left + (maxLineWidth / 2) - (drawing.width / 2),
+            y: currentY,
+            width: drawing.width,
+            height: drawingHeight,
+            drawing: drawing
+          } as any]
+        });
+
+        currentY += drawingHeight + config.lineSpacing;
+        lineIndex++;
+        i++;
+        continue;
+      }
+    }
+
     // Check if line is a table specifier or markdown table starts
     let tableStyle: 'ruler' | 'handdrawn' | 'printed' = 'handdrawn';
     let isTableBlock = false;
@@ -1901,25 +1945,35 @@ export function wrapTextIntoPages(
     if (trimmed.startsWith('$$') && trimmed.endsWith('$$')) {
       const formula = trimmed.slice(2, -2).trim();
       
-      if (currentY + config.lineSpacing * 1.8 > PAGE_HEIGHT - config.margins.bottom) {
+      const dims = measureLaTeXFormulaDimensions(formula, fontSize, config, style);
+      
+      // Dynamically calculate very generous padding so that tall nested fractions (e.g. multi-story)
+      // or limits in integrals can NEVER touch or overlap with preceding/following text lines!
+      const topPadding = dims.ascent > 35 ? (18 + (dims.ascent - 35) * 0.35) : 15;
+      const bottomPadding = dims.descent > 30 ? (24 + (dims.descent - 30) * 0.3) : 22;
+      const formulaHeight = dims.ascent + dims.descent + topPadding + 12;
+
+      if (currentY + formulaHeight > PAGE_HEIGHT - config.margins.bottom) {
         pages.push({ lines: currentPageLines });
         currentPageLines = [];
         currentY = config.margins.top;
       }
 
-      const formulaWidth = measureLaTeXFormula(formula, fontSize, config, style);
+      // Safe baseline Y so that the topmost numerator or integral limits never touch the line above!
+      const targetY = currentY + dims.ascent + topPadding;
 
       currentPageLines.push({
-        y: currentY,
+        y: targetY,
         elements: [{
           type: 'latex',
-          x: config.margins.left + (maxLineWidth / 2) - (formulaWidth / 2),
-          y: currentY,
-          width: formulaWidth,
+          x: config.margins.left + (maxLineWidth / 2) - (dims.width / 2),
+          y: targetY,
+          width: dims.width,
           latexExpression: formula
         }]
       });
-      currentY += Math.max(config.lineSpacing * 1.8, 55);
+      // Set future currentY baseline safely below the lowest denominator or integral tail!
+      currentY = targetY + dims.descent + bottomPadding;
       lineIndex++;
       i++;
       continue;
@@ -2291,13 +2345,15 @@ function buildLayout(
   horizontalLines: Array<{ x1: number; y1: number; x2: number; y2: number; type?: string }>,
   textElements: Array<{ char: string; x: number; y: number; fontSize: number; fontFamily?: string; rotation?: number }>
 ): { width: number; ascent: number; descent: number; render: (x: number, y: number) => void } {
-  // Overriding useFont of math formula elements to false. Cursive web fonts (Marck Script, Caveat, etc.)
-  // do not contain custom handwriting glyphs for mathematical operators, summations, integrations, roots,
-  // or Greek letters, which leads to broken, missing, or misaligned blocky system print font fallbacks.
-  // Forcing useFont to false on activeStyle ensures all math formulas rendering always use highly detailed vector stroke shapes.
-  const activeStyle = style ? { ...style, useFont: false } : undefined;
-  style = activeStyle;
-  const useFont = false;
+  // Math symbols slant should match the handwriting style perfectly
+  // and we allow hybrid font rendering: standard characters and digits use real Web Fonts (with the modified slant)
+  // while special math elements / Greek letters are printed using custom handwriting vector strokes.
+  const mathStyle = style ? {
+    ...style,
+    slant: style.slant
+  } : undefined;
+  style = mathStyle;
+  const useFont = style?.useFont || false;
 
   switch (node.type) {
     case 'space': {
@@ -2313,33 +2369,46 @@ function buildLayout(
     case 'char':
     case 'symbol': {
       const charStr = node.type === 'char' ? node.char : node.seq;
+      // If it's a TeX command (like \alpha, \int, \sum) or greek/special math symbols, we force itemUseFont to false
+      // so it renders using our highly detailed vector handwriting strokes!
+      const isSpecialMathGlyph = charStr.startsWith('\\') || [
+        'α', 'β', 'γ', 'δ', 'Δ', 'θ', 'λ', 'μ', 'ρ', 'σ', 'φ', 'ψ', 'ω', 'Ω', '∫', '∑', '∏', '√', '∞',
+        '°', '±', '×', '÷', '≈', '≠', '≤', '≥', '∂', '∇', 'ħ', 'π', '·', '→', 'Σ'
+      ].includes(charStr);
+      const itemUseFont = useFont && !isSpecialMathGlyph;
+
+      const isBracket = ['(', ')', '[', ']', '{', '}'].includes(charStr);
+      const mathGlyphSizeMultiplier = isSpecialMathGlyph ? 1.25 : (isBracket ? 1.15 : 1.0);
+      const scaledSize = size * mathGlyphSizeMultiplier;
+
+      const glyphResStyle = itemUseFont ? style : (style ? { ...style, useFont: false } : undefined);
       const glyphRes = renderGlyphToSVGPath(
         charStr,
         0,
         0,
-        size,
+        scaledSize,
         actualConfig,
         0,
         1,
-        style
+        glyphResStyle
       );
 
       const w = glyphRes.width;
-      const asc = size * 0.75;
-      const desc = size * 0.25;
+      const asc = scaledSize * 0.75;
+      const desc = scaledSize * 0.25;
 
       return {
         width: w,
         ascent: asc,
         descent: desc,
         render: (rx, ry) => {
-          if (useFont) {
+          if (itemUseFont) {
             const displayChar = REVERSE_ALIAS_MAP[charStr] || charStr;
             textElements.push({
               char: displayChar,
               x: rx,
-              y: ry + (style?.baselineOffset || 0) * (size / 100),
-              fontSize: size,
+              y: ry + (style?.baselineOffset || 0) * (scaledSize / 100),
+              fontSize: scaledSize,
               fontFamily: style?.fontFamily,
               rotation: glyphRes.rotation || 0
             });
@@ -2347,12 +2416,12 @@ function buildLayout(
             const drawRes = renderGlyphToSVGPath(
               charStr,
               rx,
-              ry - size * 0.25,
-              size,
+              ry - scaledSize * 0.25,
+              scaledSize,
               actualConfig,
               0,
               1,
-              style
+              style ? { ...style, useFont: false } : undefined
             );
             if (drawRes.pathData) {
               paths.push({ d: drawRes.pathData });
@@ -2389,22 +2458,24 @@ function buildLayout(
     }
 
     case 'frac': {
-      const scaleFactor = 0.75;
+      const scaleFactor = 0.80;
       const scaledSize = Math.max(11, size * scaleFactor);
       const numLayout = buildLayout(node.num, scaledSize, actualConfig, style, paths, horizontalLines, textElements);
       const denLayout = buildLayout(node.den, scaledSize, actualConfig, style, paths, horizontalLines, textElements);
 
-      const fracW = Math.max(numLayout.width, denLayout.width) + 12;
+      const horizontalPadding = Math.max(4, size * 0.16);
+      const fracW = Math.max(numLayout.width, denLayout.width) + horizontalPadding * 2;
       const lineGap = Math.max(2, scaledSize * 0.11);
-      const asc = numLayout.ascent + numLayout.descent + lineGap + 3;
-      const desc = denLayout.ascent + denLayout.descent + lineGap + 3;
+      const verticalPadding = Math.max(2, size * 0.12);
+      const asc = numLayout.ascent + numLayout.descent + lineGap + verticalPadding;
+      const desc = denLayout.ascent + denLayout.descent + lineGap + verticalPadding;
 
       return {
         width: fracW,
         ascent: asc,
         descent: desc,
         render: (rx, ry) => {
-          const middleY = ry - 4;
+          const middleY = ry - (size * 0.16);
           horizontalLines.push({
             x1: rx,
             y1: middleY,
@@ -2432,54 +2503,60 @@ function buildLayout(
       const degLayout = node.degree ? buildLayout(node.degree, size * degScale, actualConfig, style, paths, horizontalLines, textElements) : null;
       
       const degW = degLayout ? degLayout.width : 0;
-      const hookW = Math.max(14, degW + 6);
-      const gapRight = 4;
-      const totalW = hookW + contentLayout.width + gapRight;
+      const hookW = Math.max(size * 0.58, degW + (size * 0.25));
       
-      const extAsc = Math.max(contentLayout.ascent + 5, degLayout ? (contentLayout.ascent + degLayout.ascent - 2) : 0);
-      const desc = contentLayout.descent + 3;
+      // We implement a generous left gap 'contentGapLeft' and increased 'gapRight' on the right
+      // to keep math symbols/text under the square root safely separated from the left diagonal line hook
+      // and from crossing over/colliding with root lines in long formulas!
+      const contentGapLeft = size * 0.25;
+      const gapRight = size * 0.33;
+      const totalW = hookW + contentGapLeft + contentLayout.width + gapRight;
+      
+      const extAsc = Math.max(contentLayout.ascent + (size * 0.2), degLayout ? (contentLayout.ascent + degLayout.ascent - (size * 0.08)) : 0);
+      const desc = contentLayout.descent + (size * 0.12);
 
       return {
         width: totalW,
         ascent: extAsc,
         descent: desc,
         render: (rx, ry) => {
-          const topY = ry - contentLayout.ascent - 3;
-          const bottomY = ry + contentLayout.descent + 3;
+          const topY = ry - contentLayout.ascent - (size * 0.12);
+          const bottomY = ry + contentLayout.descent + (size * 0.12);
           
-          // Render the content under root
-          contentLayout.render(rx + hookW, ry);
+          // Render the content under root, shifted safely by hookW + contentGapLeft
+          contentLayout.render(rx + hookW + contentGapLeft, ry);
 
+          const tWidth = size * 0.12;
           // 1. Entrance tick
           horizontalLines.push({
             x1: rx,
             y1: ry - size * 0.12,
-            x2: rx + 3,
+            x2: rx + tWidth,
             y2: ry - size * 0.12,
             type: 'root'
           });
 
           // 2. Diagonal down to root bottom crook
           horizontalLines.push({
-            x1: rx + 3,
+            x1: rx + tWidth,
             y1: ry - size * 0.12,
-            x2: rx + 6,
+            x2: rx + tWidth * 2,
             y2: bottomY,
             type: 'root'
           });
 
-          // 3. Diagonal up from crook to roof start
+          // 3. Diagonal up from crook to roof start (ends safely before the content start)
           horizontalLines.push({
-            x1: rx + 6,
+            x1: rx + tWidth * 2,
             y1: bottomY,
-            x2: rx + hookW - 2,
+            x2: rx + hookW + contentGapLeft - 2,
             y2: topY,
             type: 'root'
           });
 
           // 4. Roof roof horizontal bar covering content
           horizontalLines.push({
-            x1: rx + hookW - 2,
+            x1: rx + hookW + contentGapLeft - 2,
             y1: topY,
             x2: rx + totalW,
             y2: topY,
@@ -2488,8 +2565,8 @@ function buildLayout(
 
           // Render root degree if present (e.g. \sqrt[3]{...} or \sqrt[99999]{...})
           if (degLayout) {
-            const degX = rx + 2 + (hookW - 6 - degW) / 2;
-            const degY = ry - contentLayout.ascent * 0.25 - 2;
+            const degX = rx + (size * 0.08) + (hookW - (size * 0.25) - degW) / 2;
+            const degY = ry - contentLayout.ascent * 0.25 - (size * 0.08);
             degLayout.render(degX, degY);
           }
         }
@@ -2498,14 +2575,17 @@ function buildLayout(
 
     case 'script': {
       const baseLayout = buildLayout(node.base, size, actualConfig, style, paths, horizontalLines, textElements);
-      const scriptScale = 0.6;
+      const scriptScale = 0.70;
       const supLayout = node.sup ? buildLayout(node.sup, size * scriptScale, actualConfig, style, paths, horizontalLines, textElements) : null;
       const subLayout = node.sub ? buildLayout(node.sub, size * scriptScale, actualConfig, style, paths, horizontalLines, textElements) : null;
 
+      const gapWidth = Math.max(1, size * 0.08);
       const rightWidth = Math.max(supLayout?.width || 0, subLayout?.width || 0);
-      const totalW = baseLayout.width + rightWidth + 2;
-      const asc = Math.max(baseLayout.ascent, supLayout ? (baseLayout.ascent + supLayout.ascent - 3) : 0);
-      const desc = Math.max(baseLayout.descent, subLayout ? (baseLayout.descent + subLayout.descent - 3) : 0);
+      const totalW = baseLayout.width + rightWidth + gapWidth;
+      
+      const paddingVal = Math.max(1, size * 0.12);
+      const asc = Math.max(baseLayout.ascent, supLayout ? (baseLayout.ascent + supLayout.ascent - paddingVal) : 0);
+      const desc = Math.max(baseLayout.descent, subLayout ? (baseLayout.descent + subLayout.descent - paddingVal) : 0);
 
       return {
         width: totalW,
@@ -2514,35 +2594,37 @@ function buildLayout(
         render: (rx, ry) => {
           baseLayout.render(rx, ry);
           if (supLayout) {
-            supLayout.render(rx + baseLayout.width + 1, ry - baseLayout.ascent + 5);
+            supLayout.render(rx + baseLayout.width + gapWidth, ry - baseLayout.ascent + (size * 0.2));
           }
           if (subLayout) {
-            subLayout.render(rx + baseLayout.width + 1, ry + baseLayout.descent - 2);
+            subLayout.render(rx + baseLayout.width + gapWidth, ry + baseLayout.descent - (size * 0.08));
           }
         }
       };
     }
 
     case 'bigOp': {
-      const isSum = node.op === '\\sum';
-      const isInt = node.op === '\\int';
+      const opName = node.op;
+      const isSum = opName === '\\sum';
+      const isInt = opName === '\\int';
       const opScale = isSum ? 1.3 : 1.5;
-      const opGlyphRes = renderGlyphToSVGPath(node.op, 0, 0, size * opScale, actualConfig, 0, 1, style);
+      const opGlyphRes = renderGlyphToSVGPath(opName, 0, 0, size * opScale, actualConfig, 0, 1, style ? { ...style, useFont: false } : undefined);
       const opW = opGlyphRes.width;
       const opAsc = size * opScale * 0.75;
       const opDesc = size * opScale * 0.25;
 
-      const limitScale = 0.55;
+      const limitScale = 0.65;
       const supLayout = node.sup ? buildLayout(node.sup, size * limitScale, actualConfig, style, paths, horizontalLines, textElements) : null;
       const subLayout = node.sub ? buildLayout(node.sub, size * limitScale, actualConfig, style, paths, horizontalLines, textElements) : null;
 
       const limitW = Math.max(supLayout?.width || 0, subLayout?.width || 0);
-      const totalW = Math.max(opW, limitW) + 4;
+      const totalW = Math.max(opW, limitW) + (size * 0.16);
       let asc = opAsc;
       let desc = opDesc;
 
-      if (supLayout) asc += supLayout.ascent + supLayout.descent + 3;
-      if (subLayout) desc += subLayout.ascent + subLayout.descent + 3;
+      const spaceGap = Math.max(1, size * 0.12);
+      if (supLayout) asc += supLayout.ascent + supLayout.descent + spaceGap;
+      if (subLayout) desc += subLayout.ascent + subLayout.descent + spaceGap;
 
       return {
         width: totalW,
@@ -2552,8 +2634,8 @@ function buildLayout(
           const opX = rx + (totalW - opW) / 2;
           const opY = ry - size * opScale * 0.25;
 
-          if (useFont) {
-            const displayChar = REVERSE_ALIAS_MAP[node.op] || node.op;
+          if (useFont && false) {
+            const displayChar = REVERSE_ALIAS_MAP[opName] || opName;
             textElements.push({
               char: displayChar,
               x: opX,
@@ -2563,23 +2645,23 @@ function buildLayout(
               rotation: opGlyphRes.rotation || 0
             });
           } else {
-            const drawRes = renderGlyphToSVGPath(node.op, opX, opY, size * opScale, actualConfig, 0, 1, style);
+            const drawRes = renderGlyphToSVGPath(opName, opX, opY, size * opScale, actualConfig, 0, 1, style ? { ...style, useFont: false } : undefined);
             if (drawRes.pathData) {
-              const opType = node.op === '\\int' ? 'integral' : node.op === '\\sum' ? 'sum' : 'integral';
+              const opType = opName === '\\int' ? 'integral' : opName === '\\sum' ? 'sum' : 'integral';
               paths.push({ d: drawRes.pathData, type: opType });
             }
           }
 
           if (supLayout) {
-            const offset = isInt ? 4 : 0;
+            const offset = isInt ? (size * 0.16) : 0;
             const supX = rx + (totalW - supLayout.width) / 2 + offset;
-            const supY = ry - opAsc - 4;
+            const supY = ry - opAsc - spaceGap;
             supLayout.render(supX, supY);
           }
           if (subLayout) {
-            const offset = isInt ? -2 : 0;
+            const offset = isInt ? - (size * 0.08) : 0;
             const subX = rx + (totalW - subLayout.width) / 2 + offset;
-            const subY = ry + opDesc + subLayout.ascent + 2;
+            const subY = ry + opDesc + subLayout.ascent + spaceGap;
             subLayout.render(subX, subY);
           }
         }
@@ -2594,6 +2676,31 @@ function buildLayout(
         render: () => {}
       };
   }
+}
+
+export function cleanLaTeXExpression(expression: string): string {
+  if (!expression) return '';
+  return expression
+    // Remove left/right formatting which splits parentheses into extra spaces
+    .replace(/\\left/g, '')
+    .replace(/\\right/g, '')
+    // Remove math micro-spaces
+    .replace(/\\,/g, '')
+    .replace(/\\!/g, '')
+    .replace(/\\:/g, '')
+    .replace(/\\;/g, '')
+    // Normalize LaTeX escaped spaces
+    .replace(/\\ /g, ' ')
+    // Standardize spacing inside brackets: remove whitespace right after opening bracket/parentheses and right before closing bracket/parentheses
+    .replace(/\(\s+/g, '(')
+    .replace(/\[\s+/g, '[')
+    .replace(/\{\s+/g, '{')
+    .replace(/\s+\)/g, ')')
+    .replace(/\s+\]/g, ']')
+    .replace(/\s+\}/g, '}')
+    // Replace duplicate spaces
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function parseLaTeXFormula(
@@ -2633,12 +2740,28 @@ export function parseLaTeXFormula(
   const actualConfig = config ? { ...config, paperType: 'blank' as const, showMargins: false } : configPlaceholder;
 
   try {
-    const cleanExpr = expression
-      .replace(/\\left|\\right/g, ' ')
-      .replace(/\\,|\\!|\\:|\\;|\\ /g, ' ');
+    const cleanExpr = cleanLaTeXExpression(expression);
     const ast = parseLaTeXAST(cleanExpr);
     const layout = buildLayout(ast, size, actualConfig, style, paths, horizontalLines, textElements);
     layout.render(startX, startY);
+
+    // Apply dynamic baseline-relative slant shift to all horizontal lines and text elements
+    if (style && style.slant !== 0) {
+      const slantRad = (style.slant * Math.PI) / 180;
+      const slantFactor = Math.tan(slantRad);
+
+      horizontalLines.forEach(line => {
+        const shiftX1 = (line.y1 - startY + size * 0.5) * slantFactor;
+        const shiftX2 = (line.y2 - startY + size * 0.5) * slantFactor;
+        line.x1 += shiftX1;
+        line.x2 += shiftX2;
+      });
+
+      textElements.forEach(item => {
+        const shiftX = (item.y - startY + size * 0.5) * slantFactor;
+        item.x += shiftX;
+      });
+    }
   } catch (err) {
     console.error("LaTeX rendering failed:", err);
   }
@@ -2673,9 +2796,7 @@ export function measureLaTeXFormula(
   const actualConfig = config ? { ...config, paperType: 'blank' as const, showMargins: false } : configPlaceholder;
 
   try {
-    const cleanExpr = expression
-      .replace(/\\left|\\right/g, ' ')
-      .replace(/\\,|\\!|\\:|\\;|\\ /g, ' ');
+    const cleanExpr = cleanLaTeXExpression(expression);
     const ast = parseLaTeXAST(cleanExpr);
     const paths: any[] = [];
     const horizontalLines: any[] = [];
@@ -2684,6 +2805,49 @@ export function measureLaTeXFormula(
     return layout.width;
   } catch (err) {
     return 160;
+  }
+}
+
+export function measureLaTeXFormulaDimensions(
+  expression: string,
+  size: number,
+  config?: PageConfig,
+  style?: HandwritingStyle
+): { width: number; ascent: number; descent: number } {
+  const configPlaceholder: PageConfig = {
+    paperType: 'blank',
+    fontFamily: 'sans',
+    inkColor: 'blue',
+    penStyle: 'gel',
+    lineSpacing: 28,
+    letterSpacing: 0,
+    wordSpacing: 10,
+    tiltVariance: 2,
+    spacingVariance: 0.5,
+    baselineVariance: 0.3,
+    strokeThickness: 1.5,
+    noiseLevel: 0.2,
+    margins: { top: 40, bottom: 40, left: 40, right: 40 },
+    showMargins: false,
+    curvedLines: false
+  };
+
+  const actualConfig = config ? { ...config, paperType: 'blank' as const, showMargins: false } : configPlaceholder;
+
+  try {
+    const cleanExpr = cleanLaTeXExpression(expression);
+    const ast = parseLaTeXAST(cleanExpr);
+    const paths: any[] = [];
+    const horizontalLines: any[] = [];
+    const textElements: any[] = [];
+    const layout = buildLayout(ast, size, actualConfig, style, paths, horizontalLines, textElements);
+    return {
+      width: layout.width,
+      ascent: layout.ascent,
+      descent: layout.descent
+    };
+  } catch (err) {
+    return { width: 160, ascent: size * 1.5, descent: size * 1.5 };
   }
 }
 

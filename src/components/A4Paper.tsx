@@ -1,8 +1,210 @@
 import React, { useState, useEffect } from 'react';
-import { PageConfig, HandwritingStyle } from '../types';
+import { PageConfig, HandwritingStyle, Drawing, ToolType, InkColor } from '../types';
 import { PAGE_HEIGHT, PAGE_WIDTH, parseLaTeXFormula, RenderedPage, renderGlyphToSVGPath } from '../utils/handwritingEngine';
 import { Download, FileDown, Eye, FileText, ChevronLeft, ChevronRight, Sparkles, Printer } from 'lucide-react';
 
+const DRAWING_COLORS: Record<string, string> = {
+  blue: '#1d3f94',
+  black: '#17171a',
+  purple: '#5c2090',
+  red: '#c91818',
+  green: '#14612d',
+  pink: '#e3305d',
+  orange: '#ea580c',
+  yellow: '#f4af00',
+  brown: '#7a431d',
+  grey: '#4d4f52',
+  pencil: '#4d4f52'
+};
+
+export function getDrawingTemplatePaths(templateId: string): Array<Array<[number, number]>> {
+  switch (templateId) {
+    case 'cone': // Math Cone
+      return [
+        // Ellipse base (rendered with 36 points)
+        Array.from({ length: 37 }, (_, i) => {
+          const angle = (i * 10 * Math.PI) / 180;
+          return [50 + 35 * Math.cos(angle), 80 + 10 * Math.sin(angle)] as [number, number];
+        }),
+        // Left side line
+        [[15, 80], [50, 15]],
+        // Right side line
+        [[85, 80], [50, 15]],
+        // Vertical height line
+        [[50, 15], [50, 80]],
+        // Base radius helper
+        [[50, 80], [85, 80]]
+      ];
+    case 'flower': // Daisy Doodle
+      const petalPaths: Array<Array<[number, number]>> = [];
+      // Center circle
+      petalPaths.push(
+        Array.from({ length: 25 }, (_, i) => {
+          const angle = (i * 15 * Math.PI) / 180;
+          return [50 + 8 * Math.cos(angle), 50 + 8 * Math.sin(angle)] as [number, number];
+        })
+      );
+      // 8 petals
+      for (let p = 0; p < 8; p++) {
+        const pAngle = (p * 45 * Math.PI) / 180;
+        const pts: Array<[number, number]> = [];
+        pts.push([50, 50]);
+        // Curve out
+        const cosP = Math.cos(pAngle);
+        const sinP = Math.sin(pAngle);
+        const cosOrth = -Math.sin(pAngle);
+        const sinOrth = Math.cos(pAngle);
+        pts.push([50 + 20 * cosP - 6 * cosOrth, 50 + 20 * sinP - 6 * sinOrth]);
+        pts.push([50 + 32 * cosP, 50 + 32 * sinP]);
+        pts.push([50 + 20 * cosP + 6 * cosOrth, 50 + 20 * sinP + 6 * sinOrth]);
+        pts.push([50, 50]);
+        petalPaths.push(pts);
+      }
+      // Stem
+      petalPaths.push([[50, 58], [50, 92]]);
+      // Leaf
+      petalPaths.push([[50, 75], [62, 70], [50, 82]]);
+      return petalPaths;
+    case 'heart': // Notebook Heart
+      return [
+        Array.from({ length: 31 }, (_, i) => {
+          const t = (i / 15) - 1; // from -1 to 1
+          const radians = t * Math.PI;
+          const x = 50 + 30 * Math.sin(radians) * Math.sin(radians) * Math.sin(radians);
+          const y = 50 - (13 * Math.cos(radians) - 5 * Math.cos(2 * radians) - 2 * Math.cos(3 * radians) - Math.cos(4 * radians)) * 1.5;
+          return [x, y] as [number, number];
+        })
+      ];
+    case 'house': // Cabin sketchy vector
+      return [
+        [[25, 52], [75, 52], [75, 88], [25, 88], [25, 52]],
+        [[20, 52], [50, 18], [80, 52]],
+        [[35, 88], [35, 62], [48, 62], [48, 88]],
+        [[45, 75], [46, 75]],
+        [[55, 60], [67, 60], [67, 72], [55, 72], [55, 60]],
+        [[61, 60], [61, 72]],
+        [[55, 66], [67, 66]],
+        [[63, 31], [63, 22], [70, 22], [70, 41]]
+      ];
+    case 'wave': // Sine wave graph with axes and tick coordinates
+      return [
+        [[8, 55], [92, 55]],
+        [[88, 51], [92, 55], [88, 59]],
+        [[20, 92], [20, 8]],
+        [[16, 12], [20, 8], [24, 12]],
+        Array.from({ length: 66 }, (_, i) => {
+          const x = 20 + i;
+          const rad = ((x - 20) / 45) * 2.5 * Math.PI;
+          const y = 55 - 25 * Math.sin(rad);
+          return [x, y] as [number, number];
+        })
+      ];
+    case 'cat': // Cat sketch doodle
+      return [
+        Array.from({ length: 31 }, (_, i) => {
+          const angle = (i * 12 * Math.PI) / 180;
+          return [50 + 26 * Math.cos(angle), 58 + 22 * Math.sin(angle)] as [number, number];
+        }),
+        [[30, 40], [22, 12], [42, 38]],
+        [[70, 40], [78, 12], [58, 38]],
+        [[40, 52], [43, 52]],
+        [[60, 52], [57, 52]],
+        [[48, 60], [52, 60], [50, 63], [48, 60]],
+        [[50, 63], [46, 68]],
+        [[50, 63], [54, 68]],
+        [[28, 62], [14, 61]],
+        [[28, 65], [12, 67]],
+        [[28, 68], [15, 73]],
+        [[72, 62], [86, 61]],
+        [[72, 65], [88, 67]],
+        [[72, 68], [85, 73]]
+      ];
+    default:
+      return [];
+  }
+}
+
+export function getHanddrawnDrawingPaths(
+  drawing: Drawing,
+  pX: number,
+  pY: number,
+  pWidth: number,
+  pHeight: number
+): string[] {
+  const sourcePaths = drawing.templateId === 'custom' 
+    ? (drawing.paths || []) 
+    : getDrawingTemplatePaths(drawing.templateId);
+
+  const pathStrings: string[] = [];
+  const similarity = drawing.similarity || 1;
+
+  const getWiggle = (index: number, simLevel: number) => {
+    if (simLevel === 1) return 0;
+    if (simLevel === 2) {
+      return Math.sin(index * 0.9 + pX * 0.1) * 0.45;
+    }
+    if (simLevel === 3) {
+      return Math.sin(index * 1.5) * 1.3 + (Math.sin(index * 3.7) * 0.5);
+    }
+    if (simLevel === 4) {
+      return Math.sin(index * 2.1) * 2.6 + (Math.cos(index * 4.8) * 1.3);
+    }
+    return Math.sin(index * 1.3) * 2.2 + (Math.sin(index * 3.9) * 1.1);
+  };
+
+  const isBadArtist = similarity === 5;
+  const skewX = isBadArtist ? (pWidth * 0.08 * (Math.sin(pX) > 0 ? 1 : -1)) : 0;
+  const skewY = isBadArtist ? (pHeight * 0.06 * (Math.cos(pY) > 0 ? 1 : -1)) : 0;
+  const scaleW = isBadArtist ? 0.86 : 1.0;
+  const scaleH = isBadArtist ? 1.06 : 1.0;
+
+  sourcePaths.forEach((pathPoints, pathIdx) => {
+    if (pathPoints.length === 0) return;
+
+    let segmentOffsetX = 0;
+    let segmentOffsetY = 0;
+    if (isBadArtist) {
+      segmentOffsetX = Math.sin(pathIdx * 4.3 + pX * 0.45) * 9.5;
+      segmentOffsetY = Math.cos(pathIdx * 3.1 + pY * 0.45) * 7.5;
+    }
+
+    let d = '';
+    pathPoints.forEach((pt, idx) => {
+      const origX = pt[0];
+      const origY = pt[1];
+
+      let scaledX = (origX / 100) * pWidth * scaleW;
+      let scaledY = (origY / 100) * pHeight * scaleH;
+
+      if (isBadArtist) {
+        scaledX += (origY / 100) * skewX;
+        scaledY += (origX / 100) * skewY;
+      }
+
+      let x = pX + scaledX + segmentOffsetX;
+      let y = pY + scaledY + segmentOffsetY;
+
+      x += getWiggle(idx, similarity);
+      y += getWiggle(idx + 10, similarity);
+
+      if (isBadArtist && idx === 0) {
+        const angle = Math.sin(pathIdx * 9.7) * Math.PI;
+        x += Math.cos(angle) * 11;
+        y += Math.sin(angle) * 11;
+      }
+
+      if (idx === 0) {
+        d += `M ${x.toFixed(1)} ${y.toFixed(1)}`;
+      } else {
+        d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+      }
+    });
+
+    pathStrings.push(d);
+  });
+
+  return pathStrings;
+}
 
 interface A4PaperProps {
   pages: RenderedPage[];
@@ -309,19 +511,18 @@ function HandwritingPageSVG({
                   const isLaTeX = el.type === 'latex';
                   const parsed = parseLaTeXFormula(el.latexExpression, el.x, el.y, fontSize, config, style);
                   const parsedTextElements = (parsed as any).textElements || [];
-                  return (
-                    <g key={elIdx} stroke={inkColorHex} strokeLinecap="round" strokeLinejoin="round" fill="none">
-                      {parsed.paths.map((p: any, pIdx) => {
-                        const isRootOrIntegral = isLaTeX && p.type && ['root', 'integral'].includes(p.type);
-                        const calculatedStrokeWidth = isRootOrIntegral 
-                          ? config.strokeThickness * 1.65 
-                          : config.strokeThickness;
+                  const strokeProps = getStrokeProps(config.strokeThickness, config.penStyle, config.inkColor, config.toolType);
+                  const calculatedStrokeWidth = strokeProps.strokeWidth;
 
+                  return (
+                    <g key={elIdx} stroke={inkColorHex} strokeLinecap={strokeProps.strokeLinecap as any} strokeLinejoin="round" fill="none">
+                      {parsed.paths.map((p: any, pIdx) => {
                         return (
                           <path
                             key={`p-${pIdx}`}
                             d={p.d}
                             strokeWidth={calculatedStrokeWidth}
+                            opacity={strokeProps.opacity}
                             className={isAnimating ? 'animate-drawn-stroke' : ''}
                             style={isAnimating ? {
                               strokeDasharray: '150',
@@ -336,23 +537,31 @@ function HandwritingPageSVG({
                         );
                       })}
                       {parsed.horizontalLines.map((lineDef: any, lIdx) => {
-                        const isRootRoof = isLaTeX && lineDef.type === 'root';
-                        const isFractionBar = isLaTeX && lineDef.type === 'fraction';
-                        const calculatedStrokeWidth = isRootRoof 
-                          ? config.strokeThickness * 1.65
-                          : isFractionBar
-                          ? config.strokeThickness * 1.35
-                          : config.strokeThickness * 1.2;
+                        const pathData = getHanddrawnPath(
+                          lineDef.x1,
+                          lineDef.y1,
+                          lineDef.x2,
+                          lineDef.y2
+                        );
 
                         return (
-                          <line
+                          <path
                             key={`h-${lIdx}`}
-                            x1={lineDef.x1}
-                            y1={lineDef.y1}
-                            x2={lineDef.x2}
-                            y2={lineDef.y2}
+                            d={pathData}
                             stroke={inkColorHex}
                             strokeWidth={calculatedStrokeWidth}
+                            opacity={strokeProps.opacity}
+                            fill="none"
+                            className={isAnimating ? 'animate-drawn-stroke' : ''}
+                            style={isAnimating ? {
+                              strokeDasharray: '150',
+                              strokeDashoffset: '150',
+                              animationName: 'handwritingDraw',
+                              animationDuration: `${animationSpeed}s`,
+                              animationTimingFunction: 'ease-in-out',
+                              animationFillMode: 'forwards',
+                              animationDelay: `${(lineIdx * 0.1) + (lIdx * 0.05)}s`
+                            } : {}}
                           />
                         );
                       })}
@@ -598,6 +807,54 @@ function HandwritingPageSVG({
                       {cellTexts}
                     </g>
                   );
+                }
+
+                if (el.type === 'drawing' && el.drawing) {
+                  const drawing = el.drawing;
+                  const dHeight = el.height || el.width || 120;
+                  
+                  let forcedColorHex = inkColorHex;
+                  if (drawing.inkColor !== 'original' && drawing.inkColor) {
+                    const matchedHex = DRAWING_COLORS[drawing.inkColor];
+                    if (matchedHex) forcedColorHex = matchedHex;
+                  }
+
+                  const dTool = drawing.renderMode === 'original' ? 'pen' : (drawing.toolType || 'pen');
+                  const strokeProps = getStrokeProps(config.strokeThickness, config.penStyle, drawing.inkColor === 'original' ? config.inkColor : drawing.inkColor, dTool);
+
+                  if (drawing.renderMode === 'original' && drawing.url) {
+                    return (
+                      <g key={elIdx}>
+                        <image
+                          href={drawing.url}
+                          x={el.x}
+                          y={el.y}
+                          width={el.width}
+                          height={dHeight}
+                          preserveAspectRatio="xMidYMid meet"
+                        />
+                      </g>
+                    );
+                  } else {
+                    const pathStrings = getHanddrawnDrawingPaths(drawing, el.x, el.y, el.width, dHeight);
+                    const isMultiply = dTool !== 'pen' || config.inkColor === 'pencil' || config.inkColor === 'marker-yellow' || config.inkColor.startsWith('felt');
+
+                    return (
+                      <g key={elIdx} stroke={forcedColorHex} strokeLinecap={strokeProps.strokeLinecap as any} strokeLinejoin="round" fill="none">
+                        {pathStrings.map((dStr, pIdx) => (
+                          <path
+                            key={`d-path-${pIdx}`}
+                            d={dStr}
+                            strokeWidth={strokeProps.strokeWidth * (dTool === 'pencil' ? 0.95 : dTool === 'marker' ? 1.6 : dTool === 'felt' ? 1.3 : 1.0)}
+                            opacity={strokeProps.opacity}
+                            style={{
+                              mixBlendMode: isMultiply ? 'multiply' : 'normal'
+                            }}
+                          />
+                        ))}
+                      </g>
+                    );
+                  }
                 }
 
                 if (el.useFont) {

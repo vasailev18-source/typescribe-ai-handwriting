@@ -58,7 +58,7 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
   const [showParametersPane, setShowParametersPane] = useState<boolean>(false);
 
   // Template customizer variables
-  const [selectedTemplateGroup, setSelectedTemplateGroup] = useState<string>('cyrillic');
+  const [selectedTemplateGroup, setSelectedTemplateGroup] = useState<string>('russian');
   const [templatePageIndex, setTemplatePageIndex] = useState<number>(0);
 
   // Custom blank template constructor variables
@@ -125,7 +125,19 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
     '+', '-', '=', '/', '*', '(', ')', '[', ']', '{', '}', '<', '>', ',', '.', '?', '!', ':', ';', '\'', '"', '%', '&', '_', '#', '@', '$',
     '\\alpha', '\\beta', '\\gamma', '\\delta', '\\Delta', '\\theta', '\\lambda', '\\mu', '\\rho', '\\sigma', '\\phi', '\\psi', '\\omega', '\\Omega',
-    '\\degree', '\\pm', '\\times', '\\div', '\\approx', '\\ne', '\\le', '\\ge', '\\partial', '\\nabla', '\\infty', '\\hbar', '\\int', '\\sum', '\\sqrt', '\\pi'
+    '\\degree', '\\pm', '\\times', '\\div', '\\approx', '\\ne', '\\le', '\\ge', '\\partial', '\\nabla', '\\infty', '\\hbar', '\\int', '\\sum', '\\sqrt', '\\pi',
+    // Latin ligatures
+    'ff', 'fi', 'fl', 'ft', 'th', 'te', 'st', 'ch', 'ck', 'sh', 'sch', 'er', 'en', 'on', 'an', 'and', 'ing', 'ion', 'ment', 'of', 'to', 'in', 'is', 'it', 'yo', 're', 'ee', 'oo', 'll', 'tt',
+    // Cyrillic ligatures
+    'ст', 'по', 'он', 'ен', 'то', 'на', 'ли', 'ко', 'ра', 'ла', 'но', 'ре', 'ть', 'ом', 'пр', 'ве', 'ни', 'го', 'те', 'ки',
+    'ши', 'иш', 'ии', 'шш', 'ші', 'іш', 'іі', 'ил', 'ль', 'ми', 'им', 'мм', 'шл', 'лш', 'мл', 'лм', 'ци', 'иц', 'щи', 'ищ',
+    'ов', 'ош', 'во', 'вн', 'ви', 'вл', 'бо', 'би', 'бл',
+    'ти', 'ит', 'тт', 'пи', 'ип', 'пп', 'тп', 'пт', 'ди', 'ид',
+    'їй', 'її', 'ії', 'вм', 'ьє', 'іє',
+    'оо', 'оа', 'ао', 'сс', 'ее', 'ос', 'ас', 'ес', 'ох', 'ах', 'дв', 'дб',
+    'зу', 'уз', 'дз', 'дж', 'цу', 'щу',
+    'ка', 'ке', 'жж', 'фл', 'фи',
+    'ья', 'ью', 'ье', 'ьо', 'ые', 'ыи', '’я', '’ю', '’є', '’ї'
   ];
 
   // Load selected style details natively
@@ -239,24 +251,101 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
     }
 
     switch (group) {
-      case 'cyrillic':
-        return charList.filter(c => 
-          (c >= 'А' && c <= 'Я') || 
-          (c >= 'а' && c <= 'я') || 
-          ['ё', 'І', 'Ї', 'Є', 'Ґ', 'і', 'ї', 'є', 'ґ', 'Ў', 'ў'].includes(c)
+      case 'russian': {
+        const base = charList.filter(c => 
+          c.length === 1 && (
+            (c >= 'А' && c <= 'Я') || 
+            (c >= 'а' && c <= 'я') || 
+            ['ё'].includes(c)
+          )
         );
-      case 'latin':
-        return charList.filter(c => 
-          (c >= 'a' && c <= 'z') || 
-          (c >= 'A' && c <= 'Z')
+        const ruLigs = [
+          'ст', 'по', 'он', 'ен', 'то', 'на', 'ли', 'ко', 'ра', 'ла', 'но', 'ре', 'ть', 'ом', 'пр', 'ве', 'ни', 'го', 'те', 'ки',
+          'ши', 'иш', 'ии', 'шш', 'ил', 'ль', 'ми', 'им', 'мм', 'шл', 'лш', 'мл', 'лм', 'ци', 'иц', 'щи', 'ищ',
+          'ов', 'ош', 'во', 'вн', 'ви', 'вл', 'бо', 'би', 'бл',
+          'ти', 'ит', 'тт', 'пи', 'ип', 'пп', 'тп', 'пт', 'ди', 'ид',
+          'оо', 'оа', 'ао', 'сс', 'ее', 'ос', 'ас', 'ес', 'ох', 'ах', 'дв', 'дб',
+          'зу', 'уз', 'цу', 'ка', 'ке', 'жж', 'фл', 'фи',
+          'ья', 'ью', 'ье', 'ьо', 'ые', 'ыи'
+        ];
+        return [...base, ...ruLigs];
+      }
+      case 'ukrainian': {
+        const base = charList.filter(c => 
+          c.length === 1 && (
+            ((c >= 'А' && c <= 'Я') || (c >= 'а' && c <= 'я') || ['І', 'Ї', 'Є', 'Ґ', 'і', 'ї', 'є', 'ґ'].includes(c)) &&
+            !['ё', 'ы', 'ъ', 'э'].includes(c)
+          )
         );
+        const uaLigs = [
+          'дз', 'дж', 'їй', 'її', 'ії', 'ьє', 'іє', 'вм', '’я', '’ю', '’є', '’ї',
+          'ст', 'по', 'он', 'ен', 'то', 'на', 'ли', 'ко', 'ра', 'ла', 'но', 'ре', 'ть', 'ом', 'пр', 'ве', 'ни', 'го', 'те', 'ки',
+          'ши', 'иш', 'ии', 'шш', 'ші', 'іш', 'іі', 'ил', 'ль', 'ми', 'им', 'мм', 'шл', 'лш', 'мл', 'лм', 'ци', 'иц', 'щи', 'ищ',
+          'ов', 'ош', 'во', 'вн', 'ви', 'вл', 'бо', 'би', 'бл',
+          'ти', 'ит', 'тт', 'пи', 'ип', 'пп', 'тп', 'пт', 'ди', 'ид',
+          'оо', 'оа', 'ао', 'сс', 'ее', 'ос', 'ас', 'ес', 'ох', 'ах', 'дв', 'дб',
+          'зу', 'уз', 'ка', 'ке', 'жж', 'фл', 'фи', 'ья', 'ью', 'ье', 'ьо'
+        ];
+        return [...base, ...uaLigs];
+      }
+      case 'belarusian': {
+        const base = charList.filter(c => 
+          c.length === 1 && (
+            ((c >= 'А' && c <= 'Я') || (c >= 'а' && c <= 'я') || ['І', 'і', 'Ў', 'ў'].includes(c)) &&
+            !['и', 'щ', 'ъ', 'И', 'Щ', 'Ъ'].includes(c)
+          )
+        );
+        const byLigs = [
+          'дз', 'дж', 'ьё', 'ўе', 'ўи', 'ўя', 'ўю', 'ўе',
+          'ст', 'по', 'он', 'ен', 'то', 'на', 'ли', 'ко', 'ра', 'ла', 'но', 'ре', 'ть', 'ом', 'пр', 'ве', 'ни', 'го', 'те', 'ки',
+          'ши', 'иш', 'ии', 'шш', 'ші', 'іш', 'іі', 'ил', 'ль', 'ми', 'им', 'мм', 'шл', 'лш', 'мл', 'лм', 'ци', 'иц',
+          'ов', 'ош', 'во', 'вн', 'ви', 'вл', 'бо', 'би', 'бл',
+          'ти', 'ит', 'тт', 'пи', 'ип', 'пп', 'тп', 'пт', 'ди', 'ид',
+          'оо', 'оа', 'ао', 'сс', 'ее', 'ос', 'ас', 'ес', 'ох', 'ах', 'дв', 'дб',
+          'зу', 'уз', 'ка', 'ке', 'жж', 'фл', 'фи', 'ья', 'ью', 'ье', 'ьо', 'ые', 'ыи', '’я', '’ю', '’є', '’ї'
+        ];
+        return [...base, ...byLigs];
+      }
+      case 'cyrillic': {
+        const base = charList.filter(c => 
+          c.length === 1 && (
+            (c >= 'А' && c <= 'Я') || 
+            (c >= 'а' && c <= 'я') || 
+            ['ё', 'І', 'Ї', 'Є', 'Ґ', 'і', 'ї', 'є', 'ґ', 'Ў', 'ў'].includes(c)
+          )
+        );
+        const cyrLigs = [
+          'ст', 'по', 'он', 'ен', 'то', 'на', 'ли', 'ко', 'ра', 'ла', 'но', 'ре', 'ть', 'ом', 'пр', 'ве', 'ни', 'го', 'те', 'ки',
+          'ши', 'иш', 'ии', 'шш', 'ші', 'іш', 'іі', 'ил', 'ль', 'ми', 'им', 'мм', 'шл', 'лш', 'мл', 'лм', 'ци', 'иц', 'щи', 'ищ',
+          'ов', 'ош', 'во', 'вн', 'ви', 'вл', 'бо', 'би', 'бл',
+          'ти', 'ит', 'тт', 'пи', 'ип', 'пп', 'тп', 'пт', 'ди', 'ид',
+          'їй', 'її', 'ії', 'вм', 'ьє', 'іє',
+          'оо', 'оа', 'ао', 'сс', 'ее', 'ос', 'ас', 'ес', 'ох', 'ах', 'дв', 'дб',
+          'зу', 'уз', 'дз', 'дж', 'цу', 'щу',
+          'ка', 'ке', 'жж', 'фл', 'фи',
+          'ья', 'ью', 'ье', 'ьо', 'ые', 'ыи', '’я', '’ю', '’є', '’ї'
+        ];
+        return [...base, ...cyrLigs];
+      }
+      case 'latin': {
+        const base = charList.filter(c => 
+          c.length === 1 && (
+            (c >= 'a' && c <= 'z') || 
+            (c >= 'A' && c <= 'Z')
+          )
+        );
+        const latLigs = [
+          'ff', 'fi', 'fl', 'ft', 'th', 'te', 'st', 'ch', 'ck', 'sh', 'sch', 'er', 'en', 'on', 'an', 'and', 'ing', 'ion', 'ment', 'of', 'to', 'in', 'is', 'it', 'yo', 're', 'ee', 'oo', 'll', 'tt'
+        ];
+        return [...base, ...latLigs];
+      }
       case 'kazakh':
         return charList.filter(c => 
-          ['Ә', 'Ң', 'Ғ', 'Ү', 'Ұ', 'Қ', 'Ө', 'Һ', 'ә', 'ң', 'ғ', 'ү', 'ұ', 'қ', 'ө', 'һ'].includes(c)
+          c.length === 1 && ['Ә', 'Ң', 'Ғ', 'Ү', 'Ұ', 'Қ', 'Ө', 'Һ', 'ә', 'ң', 'ғ', 'ү', 'ұ', 'қ', 'ө', 'һ'].includes(c)
         );
       case 'european':
         return charList.filter(c => 
-          ['ä', 'ö', 'ü', 'ß', 'é', 'è', 'à', 'ç', 'ñ', 'á', 'í', 'ó', 'ú', 'Ä', 'Ö', 'Ü', 'É', 'È', 'À', 'Ç', 'Ñ', 'Á', 'Í', 'Ó', 'Ú'].includes(c)
+          c.length === 1 && ['ä', 'ö', 'ü', 'ß', 'é', 'è', 'à', 'ç', 'ñ', 'á', 'í', 'ó', 'ú', 'Ä', 'Ö', 'Ü', 'É', 'È', 'À', 'Ç', 'Ñ', 'Á', 'Í', 'Ó', 'Ú'].includes(c)
         );
       case 'numbers':
         return charList.filter(c => c >= '0' && c <= '9');
@@ -276,7 +365,7 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
           'оо', 'оа', 'ао', 'сс', 'ее', 'ос', 'ас', 'ес', 'ох', 'ах', 'дв', 'дб',
           'зу', 'уз', 'дз', 'дж', 'цу', 'щу',
           'ка', 'ке', 'жж', 'фл', 'фи',
-          'ья', 'ью', 'ье', 'ьо', 'ые', 'ыи'
+          'ья', 'ью', 'ье', 'ьо', 'ые', 'ыи', '’я', '’ю', '’є', '’ї'
         ];
       default:
         return charList;
@@ -287,6 +376,9 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
     switch(group) {
       case 'selected_only': return '⭐ Выбранные символы для печати';
       case 'custom_builder': return 'Свой индивидуальный бланк';
+      case 'russian': return 'Русский язык (символы, частые связки и лигатуры)';
+      case 'ukrainian': return 'Українська мова (літери, апостроф, зв’язки та лігатури)';
+      case 'belarusian': return 'Беларуская мова (літары, апостраф, частыя злучэнні)';
       case 'cyrillic': return 'Кириллица (Русский, Украинский, Белорусский)';
       case 'latin': return 'Латиница (English Basics)';
       case 'kazakh': return 'Казахский язык (Қазақ тілі)';
@@ -1160,13 +1252,14 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
               
               <div className="flex flex-col gap-1.5">
                 {[
-                  { id: 'cyrillic', label: 'Кириллица (RU / UA / BY)', count: getFilteredCharList('cyrillic').length },
-                  { id: 'latin', label: 'Латиница (English)', count: getFilteredCharList('latin').length },
+                  { id: 'russian', label: '🇷🇺 Русский язык (RU)', count: getFilteredCharList('russian').length },
+                  { id: 'ukrainian', label: '🇺🇦 Українська мова (UA)', count: getFilteredCharList('ukrainian').length },
+                  { id: 'belarusian', label: '🇧🇾 Беларуская мова (BY)', count: getFilteredCharList('belarusian').length },
+                  { id: 'latin', label: '🇬🇧 Латиница (English)', count: getFilteredCharList('latin').length },
                   { id: 'kazakh', label: 'Қазақша (Казахский)', count: getFilteredCharList('kazakh').length },
                   { id: 'european', label: 'European (Диакритика)', count: getFilteredCharList('european').length },
                   { id: 'numbers', label: 'Цифры (0-9)', count: getFilteredCharList('numbers').length },
                   { id: 'math', label: 'Математика и символы', count: getFilteredCharList('math').length },
-                  { id: 'ligatures', label: 'Лигатуры и связки', count: getFilteredCharList('ligatures').length },
                   { id: 'selected_only', label: '⭐ Выбранные символы', count: selectedSymbols.length },
                   { id: 'custom_builder', label: '🎨 Конструктор бланка', count: getFilteredCharList('custom_builder').length },
                   { id: 'all', label: 'Все доступные символы', count: charList.length }
@@ -1335,25 +1428,65 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
               {/* Toolbar in sheet page view */}
               <div className="w-full max-w-[595px] bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-3">
                 
-                {/* Pagination */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => setTemplatePageIndex(p => Math.max(0, p - 1))}
-                    disabled={templatePageIndex === 0}
-                    className="p-1.5 border border-slate-200 rounded-lg bg-white shadow-xs hover:bg-slate-50 transition-all disabled:opacity-40 hover:scale-105 active:scale-95 disabled:pointer-events-none"
-                  >
-                    <ChevronLeft size={14} className="text-slate-600" />
-                  </button>
-                  <span className="text-xs font-bold text-slate-700 font-mono">
-                    Страница {templatePageIndex + 1} из {Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) || 1}
-                  </span>
-                  <button
-                    onClick={() => setTemplatePageIndex(p => Math.min(Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) - 1, p + 1))}
-                    disabled={templatePageIndex >= Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) - 1}
-                    className="p-1.5 border border-slate-200 rounded-lg bg-white shadow-xs hover:bg-slate-50 transition-all disabled:opacity-40 hover:scale-105 active:scale-95 disabled:pointer-events-none"
-                  >
-                    <ChevronRight size={14} className="text-slate-600" />
-                  </button>
+                {/* Pagination and Selection Controls */}
+                <div className="flex flex-wrap items-center gap-3 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setTemplatePageIndex(p => Math.max(0, p - 1))}
+                      disabled={templatePageIndex === 0}
+                      className="p-1.5 border border-slate-200 rounded-lg bg-white shadow-xs hover:bg-slate-50 transition-all disabled:opacity-40 hover:scale-105 active:scale-95 disabled:pointer-events-none"
+                    >
+                      <ChevronLeft size={14} className="text-slate-600" />
+                    </button>
+                    <span className="text-xs font-bold text-slate-700 font-mono">
+                      Страница {templatePageIndex + 1} из {Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) || 1}
+                    </span>
+                    <button
+                      onClick={() => setTemplatePageIndex(p => Math.min(Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) - 1, p + 1))}
+                      disabled={templatePageIndex >= Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) - 1}
+                      className="p-1.5 border border-slate-200 rounded-lg bg-white shadow-xs hover:bg-slate-50 transition-all disabled:opacity-40 hover:scale-105 active:scale-95 disabled:pointer-events-none"
+                    >
+                      <ChevronRight size={14} className="text-slate-600" />
+                    </button>
+                  </div>
+
+                  {/* Selection controls */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => {
+                        const currentGroupChars = getFilteredCharList(selectedTemplateGroup);
+                        setSelectedSymbols(prev => {
+                          const union = new Set([...prev, ...currentGroupChars]);
+                          return Array.from(union);
+                        });
+                      }}
+                      className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-250/60 rounded-xl transition-all cursor-pointer"
+                      title="Выбрать все символы из данной категории шаблона"
+                    >
+                      Выбрать все
+                    </button>
+                    <button
+                      onClick={() => {
+                        const currentGroupChars = getFilteredCharList(selectedTemplateGroup);
+                        setSelectedSymbols(prev => {
+                          const updated = [...prev];
+                          currentGroupChars.forEach(char => {
+                            const idx = updated.indexOf(char);
+                            if (idx !== -1) {
+                              updated.splice(idx, 1);
+                            } else {
+                              updated.push(char);
+                            }
+                          });
+                          return updated;
+                        });
+                      }}
+                      className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all cursor-pointer"
+                      title="Инвертировать выделение в данной категории"
+                    >
+                      Инвертировать
+                    </button>
+                  </div>
                 </div>
 
                 {/* Actions mimicking calligraphr bar */}
@@ -2072,7 +2205,9 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                   <div className="flex flex-wrap gap-1 bg-slate-100/80 p-1 rounded-xl text-[10px] font-bold border border-slate-200/50">
                     {[
                       { id: 'all', label: 'Все символы' },
-                      { id: 'cyrillic', label: 'Кириллица (RU/UA/BY)' },
+                      { id: 'russian', label: 'Русский (RU)' },
+                      { id: 'ukrainian', label: 'Українська (UA)' },
+                      { id: 'belarusian', label: 'Беларуская (BY)' },
                       { id: 'latin', label: 'Латиница (English)' },
                       { id: 'kazakh', label: 'Казахский' },
                       { id: 'european', label: 'Диакритика' },
