@@ -1,4 +1,5 @@
-export type InkColor = 'blue' | 'black' | 'red' | 'purple' | 'green';
+export type InkColor = 'blue' | 'black' | 'red' | 'purple' | 'green' | 'pink' | 'orange' | 'yellow' | 'brown' | 'grey' | 'pencil' | 'felt-blue' | 'felt-pink' | 'marker-yellow';
+export type ToolType = 'pen' | 'felt' | 'pencil' | 'colored-pencil' | 'marker';
 export type PenStyle = 'ballpoint' | 'fountain' | 'gel';
 export type PaperType = 'blank' | 'lined' | 'squared';
 
@@ -21,6 +22,7 @@ export interface PageConfig {
   paperType: PaperType;
   fontFamily: 'sans' | 'serif';
   inkColor: InkColor;
+  toolType?: ToolType;
   penStyle: PenStyle;
   lineSpacing: number; // pixels (e.g., 28px)
   letterSpacing: number; // letter offset fine-tuning
@@ -40,6 +42,7 @@ export interface PageConfig {
   curvedLines: boolean; // line baselines slightly bend/wave like manual typing
   paperTexture?: 'clean' | 'fiber' | 'copy' | 'vintage'; // Realistic paper styles & scanner filters
   paperEffect?: 'none' | 'shadow' | 'scanner' | 'crumpled'; // Photoreal scanner effects & camera shadows
+  textOutlineColor?: string; // Custom text outline color (e.g. for highlights/stroke)
 }
 
 export interface GenerationHistory {

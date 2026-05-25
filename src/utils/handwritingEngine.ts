@@ -746,6 +746,29 @@ export const BASE_GLYPHS: Record<string, GlyphStrokes> = {
     [[18, 25], [16, 80]],
     [[32, 25], [34, 75], [38, 80]],
   ],
+  '\\cdot': [
+    [[23, 50], [26, 50]],
+  ],
+  'Ә': [
+    [[25, 45], [35, 45], [38, 20], [25, 18], [15, 30], [12, 55], [20, 75], [38, 70]]
+  ],
+  'ә': [
+    [[25, 45], [35, 45], [38, 20], [25, 18], [15, 30], [12, 55], [20, 75], [38, 70]]
+  ],
+  'ү': [
+    [[15, 35], [25, 60], [35, 35]],
+    [[25, 60], [25, 90], [18, 95]]
+  ],
+  'Ү': [
+    [[15, 20], [25, 50], [35, 20]],
+    [[25, 50], [25, 85]]
+  ],
+  'һ': [
+    [[15, 80], [15, 40], [15, 45], [25, 35], [38, 45], [38, 65], [38, 80], [45, 80]]
+  ],
+  'Һ': [
+    [[15, 80], [15, 10], [15, 45], [35, 45], [35, 10], [35, 80]]
+  ],
 };
 
 export function parseSVGPathToStrokes(pathData: string): Array<Array<[number, number]>> {
@@ -771,6 +794,276 @@ export function parseSVGPathToStrokes(pathData: string): Array<Array<[number, nu
   return strokes;
 }
 
+export function splitWordIntoUnits(word: string): string[] {
+  const units: string[] = [];
+  let i = 0;
+  const ligatures = [
+    // Ukrainian apostrophe ligatures (contextual connections)
+    '’я', '’ю', '’є', '’ї', '’Я', '’Ю', '’Є', '’Ї',
+    '\'я', '\'ю', '\'є', '\'ї', '\'Я', '\'Ю', '\'Є', '\'Ї',
+    '‘я', '‘ю', '‘є', '‘ї', '‘Я', '‘Ю', '‘Є', '‘Ї',
+    'ʻя', 'ʻю', 'ʻє', 'ʻї', 'ʻЯ', 'ʻЮ', 'ʻЄ', 'ʻЇ',
+    'ment',
+    'sch', 'and', 'ing', 'ion',
+    'ff', 'fi', 'fl', 'ft', 'th', 'te', 'st', 'ch', 'ck', 'sh', 'er', 'en', 'on', 'an', 'of', 'to', 'in', 'is', 'it', 'yo', 're', 'ee', 'oo', 'll', 'tt',
+    // Cyrillic ligatures and connections
+    'ст', 'по', 'он', 'ен', 'то', 'на', 'ли', 'ко', 'ра', 'ла', 'но', 'ре', 'ть', 'ом', 'пр', 'ве', 'ни', 'го', 'те', 'ки',
+    // 1. «Заборный» тип
+    'ши', 'иш', 'ии', 'шш', 'ші', 'іш', 'іі', 'ли', 'ил', 'ль', 'ми', 'им', 'мм', 'шл', 'лш', 'мл', 'лм', 'ци', 'иц', 'щи', 'ищ',
+    // 2. Верхнее соединение
+    'ов', 'ош', 'во', 'вн', 'ви', 'вл', 'бо', 'bi', 'бл',
+    // 3. «Ложная латиница»
+    'ти', 'ит', 'тт', 'пи', 'ип', 'пп', 'тп', 'пт', 'ди', 'ид',
+    // 4. Украинские связки
+    'їй', 'її', 'ії', 'вм', 'ьє', 'іє',
+    // 1. «Круглые» буквы
+    'оо', 'оа', 'ао', 'сс', 'ее', 'ос', 'ас', 'ес', 'ох', 'ах', 'дв', 'дб',
+    // 2. Буквы с «Хвостиками»
+    'зу', 'уз', 'дз', 'дж', 'цу', 'щу',
+    // 3. Сложная анатомия
+    'ка', 'ке', 'жж', 'фл', 'фи',
+    // 4. Связки с ь, ъ, ы
+    'ья', 'ью', 'ье', 'ьо', 'ые', 'ыи'
+  ];
+  
+  while (i < word.length) {
+    let matched = false;
+    for (const lig of ligatures) {
+      if (word.slice(i, i + lig.length).toLowerCase() === lig) {
+        units.push(word.slice(i, i + lig.length));
+        i += lig.length;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) {
+      units.push(word[i]);
+      i++;
+    }
+  }
+  return units;
+}
+
+export function getUnitBaseWidth(unit: string, useFont?: boolean): number {
+  if (useFont) {
+    if (unit.length <= 1) {
+      const isWide = unit === 'm' || unit === 'w' || unit === 'М' || unit === 'Ш' || unit === 'W' || unit === 'M';
+      const isNarrow = unit === 'i' || unit === 'l' || unit === '!' || unit === ';' || unit === '.' || unit === ',' || unit === '1';
+      const isApo = unit === '\'' || unit === '’' || unit === '‘' || unit === 'ʻ';
+      return isApo ? 8 : (isWide ? 44 : isNarrow ? 15 : 28);
+    }
+    let sum = 0;
+    for (let i = 0; i < unit.length; i++) {
+       const ch = unit[i];
+       const isW = ch === 'm' || ch === 'w' || ch === 'М' || ch === 'Ш' || ch === 'W' || ch === 'M';
+       const isN = ch === 'i' || ch === 'l' || ch === '!' || ch === ';' || ch === '.' || ch === ',' || ch === '1';
+       const isApo = ch === '\'' || ch === '’' || ch === '‘' || ch === 'ʻ';
+       sum += isApo ? 8 : (isW ? 42 : isN ? 14 : 26);
+    }
+    return sum;
+  } else {
+    if (unit.length <= 1) {
+      const isApo = unit === '\'' || unit === '’' || unit === '‘' || unit === 'ʻ';
+      return isApo ? 10 : (unit === 'm' || unit === 'w' || unit === 'М' || unit === 'Ш' || unit === 'M' || unit === 'W' ? 55 : 40);
+    }
+    let sum = 0;
+    for (let i = 0; i < unit.length; i++) {
+      const ch = unit[i];
+      const isApo = ch === '\'' || ch === '’' || ch === '‘' || ch === 'ʻ';
+      const base = isApo ? 10 : (ch === 'm' || ch === 'w' || ch === 'М' || ch === 'Ш' || ch === 'M' || ch === 'W' ? 45 : 32);
+      sum += base;
+    }
+    return sum;
+  }
+}
+
+interface CompositeInfo {
+  base: string;
+  diacritic: 'umlaut' | 'acute' | 'grave' | 'tilde' | 'cedilla' | 'middle-bar' | 'bottom-hook' | 'breve';
+  isCapital: boolean;
+}
+
+function getCompositeCharacterInfo(char: string): CompositeInfo | null {
+  const map: Record<string, { base: string; diacritic: CompositeInfo['diacritic'] }> = {
+    // Umlauts
+    'ä': { base: 'a', diacritic: 'umlaut' },
+    'ö': { base: 'o', diacritic: 'umlaut' },
+    'ü': { base: 'u', diacritic: 'umlaut' },
+    'ë': { base: 'e', diacritic: 'umlaut' },
+    'ÿ': { base: 'y', diacritic: 'umlaut' },
+    'Ä': { base: 'A', diacritic: 'umlaut' },
+    'Ö': { base: 'O', diacritic: 'umlaut' },
+    'Ü': { base: 'U', diacritic: 'umlaut' },
+    
+    // Acute accents
+    'é': { base: 'e', diacritic: 'acute' },
+    'á': { base: 'a', diacritic: 'acute' },
+    'í': { base: 'i', diacritic: 'acute' },
+    'ó': { base: 'o', diacritic: 'acute' },
+    'ú': { base: 'u', diacritic: 'acute' },
+    'ý': { base: 'y', diacritic: 'acute' },
+    'É': { base: 'E', diacritic: 'acute' },
+    'Á': { base: 'A', diacritic: 'acute' },
+    'Í': { base: 'I', diacritic: 'acute' },
+    'Ó': { base: 'O', diacritic: 'acute' },
+    'Ú': { base: 'U', diacritic: 'acute' },
+    
+    // Grave accents
+    'è': { base: 'e', diacritic: 'grave' },
+    'à': { base: 'a', diacritic: 'grave' },
+    'ù': { base: 'u', diacritic: 'grave' },
+    'È': { base: 'E', diacritic: 'grave' },
+    'À': { base: 'A', diacritic: 'grave' },
+    
+    // Tilde
+    'ñ': { base: 'n', diacritic: 'tilde' },
+    'ã': { base: 'a', diacritic: 'tilde' },
+    'Ñ': { base: 'N', diacritic: 'tilde' },
+    'Ã': { base: 'A', diacritic: 'tilde' },
+    
+    // Cedilla / hook
+    'ç': { base: 'c', diacritic: 'cedilla' },
+    'Ç': { base: 'C', diacritic: 'cedilla' },
+    
+    // Belarusian
+    'ў': { base: 'у', diacritic: 'breve' },
+    'Ў': { base: 'У', diacritic: 'breve' },
+    
+    // Kazakh composites
+    'ө': { base: 'о', diacritic: 'middle-bar' },
+    'Ө': { base: 'О', diacritic: 'middle-bar' },
+    'ұ': { base: 'у', diacritic: 'middle-bar' },
+    'Ұ': { base: 'У', diacritic: 'middle-bar' },
+    'ғ': { base: 'г', diacritic: 'middle-bar' },
+    'Ғ': { base: 'Г', diacritic: 'middle-bar' },
+    
+    'ң': { base: 'н', diacritic: 'bottom-hook' },
+    'Ң': { base: 'Н', diacritic: 'bottom-hook' },
+    'қ': { base: 'к', diacritic: 'bottom-hook' },
+    'Қ': { base: 'К', diacritic: 'bottom-hook' },
+  };
+
+  const res = map[char];
+  if (!res) return null;
+  // If base letter is uppercase, treat isCapital as true
+  const isCapital = char === char.toUpperCase();
+  return { base: res.base, diacritic: res.diacritic, isCapital };
+}
+
+function getDiacriticStrokes(diacritic: CompositeInfo['diacritic'], isCapital: boolean): Array<Array<[number, number]>> {
+  switch (diacritic) {
+    case 'umlaut':
+      return isCapital
+        ? [ [[20, 0], [22, 0]], [[32, 0], [34, 0]] ]
+        : [ [[20, 25], [22, 25]], [[32, 25], [34, 25]] ];
+    case 'acute':
+      return isCapital
+        ? [ [[20, 0], [32, -15]] ]
+        : [ [[20, 25], [32, 10]] ];
+    case 'grave':
+      return isCapital
+        ? [ [[30, -15], [18, 0]] ]
+        : [ [[30, 10], [18, 25]] ];
+    case 'tilde':
+      return isCapital
+        ? [ [[16, -5], [22, -10], [28, 0], [34, -5]] ]
+        : [ [[16, 20], [22, 15], [28, 25], [34, 20]] ];
+    case 'breve':
+      return isCapital
+        ? [ [[16, -5], [23, 2], [30, -5]] ]
+        : [ [[16, 20], [23, 27], [30, 20]] ];
+    case 'cedilla':
+      return [ [[25, 80], [28, 92], [20, 96]] ];
+    case 'middle-bar':
+      return isCapital
+        ? [ [[12, 48], [38, 48]] ]
+        : [ [[12, 55], [38, 55]] ];
+    case 'bottom-hook':
+      return isCapital
+        ? [ [[38, 80], [45, 96], [32, 99]] ]
+        : [ [[33, 80], [40, 96], [28, 99]] ];
+    default:
+      return [];
+  }
+}
+
+// Helper to adjust diacritical dots (on і, ї, ё, i, j, й) based on context (previous/next characters)
+// to prevent collisions with high tail letters (e.g., б, в, ъ) or double dots (consecutive її, їй, ії)
+function applyContextualDotAdjustments(
+  char: string,
+  strokes: GlyphStrokes,
+  prevC?: string,
+  nextC?: string
+): GlyphStrokes {
+  if (!strokes || strokes.length === 0) return strokes;
+
+  const result: GlyphStrokes = strokes.map(st => st.map(p => [...p]));
+
+  const c = char;
+  const p = prevC || '';
+  const n = nextC || '';
+
+  // Check if previous character ends with a high tail
+  const hasHighTail = (str: string): boolean => {
+    if (!str) return false;
+    const last = str[str.length - 1].toLowerCase();
+    return ['б', 'в', 'ъ', 'о', 'o', 'b', 'v', 'w'].includes(last);
+  };
+
+  const isDotChar = (str: string): boolean => {
+    if (!str) return false;
+    const first = str[0].toLowerCase();
+    return ['і', 'ї', 'ё', 'i', 'j', 'й'].includes(first);
+  };
+
+  // Determine dot/diacritic indices for this specific char
+  let dotIndices: number[] = [];
+  if (c === 'ё' || c === 'ї') {
+    dotIndices = [1, 2];
+  } else if (c === 'і' || c === 'i' || c === 'j' || c === 'й') {
+    dotIndices = [1];
+  } else if (c === 'Ё') {
+    dotIndices = [2, 3];
+  } else if (c === 'Ї') {
+    dotIndices = [3, 4];
+  }
+
+  if (dotIndices.length === 0) return result;
+
+  // Let's check offsets:
+  let shiftX = 0;
+  let shiftY = 0;
+
+  // Scenario 1: Adjacent to another letter with diacritic dots (avoid "dots forest" / collision)
+  if (isDotChar(c)) {
+    if (isDotChar(n)) {
+      // First of a dot/diacritic pair: push slightly left and down
+      shiftX += -3;
+      shiftY += 4;
+    } else if (isDotChar(p)) {
+      // Second of a dot/diacritic pair: push slightly right and up
+      shiftX += 3;
+      shiftY += -4;
+    }
+  }
+
+  // Scenario 2: Preceded by a letter with a high tail (e.g. 'б', 'ъ', 'в', 'ъё', 'бё' etc.)
+  // Raise points higher and shift right to clear the collision path of the tail.
+  if (hasHighTail(p)) {
+    shiftY += -13; // Move it high up to clear the tail
+    shiftX += 5;   // Shift right, so it's placed safely
+  }
+
+  // Apply shifts to the specified dot stroke coordinates
+  dotIndices.forEach(idx => {
+    if (result[idx]) {
+      result[idx] = result[idx].map(([x, y]) => [x + shiftX, y + shiftY]);
+    }
+  });
+
+  return result;
+}
+
 // Generates an SVG path data string from glyph strokes
 // Applies random slant, spacing variance, baseline wave, and jitter noise
 export function renderGlyphToSVGPath(
@@ -782,13 +1075,13 @@ export function renderGlyphToSVGPath(
   charIndex: number,
   lineIndex: number,
   style?: HandwritingStyle,
-  prevLastPoint?: [number, number] | null
+  prevLastPoint?: [number, number] | null,
+  prevUnit?: string,
+  nextUnit?: string
 ): { pathData: string; width: number; firstPoint: [number, number]; lastPoint: [number, number]; useFont?: boolean; rotation?: number } {
   // If style uses a real font-family instead of procedural SVG strokes
   if (style?.useFont) {
-    const isWide = char === 'm' || char === 'w' || char === 'М' || char === 'Ш' || char === 'W' || char === 'M';
-    const isNarrow = char === 'i' || char === 'l' || char === '!' || char === ';' || char === '.' || char === ',' || char === '1';
-    const baseWidth = isWide ? 44 : isNarrow ? 15 : 28;
+    const baseWidth = getUnitBaseWidth(char, true);
     const baseLetterSpacing = style ? style.letterSpacing : 0;
     const localSpacingOffset = config.spacingVariance * Math.cos(charIndex * 2.1 + lineIndex * 0.7);
     const targetCharWidth = (baseWidth * (size / 100)) + localSpacingOffset + config.letterSpacing + baseLetterSpacing;
@@ -812,6 +1105,7 @@ export function renderGlyphToSVGPath(
 
   // Check if character is in style's custom glyph library
   const aliasMap: Record<string, string> = {
+    '’': '\'', '‘': '\'', 'ʻ': '\'',
     'α': '\\alpha', 'β': '\\beta', 'γ': '\\gamma', 'δ': '\\delta', 'Δ': '\\Delta',
     'ε': 'e',
     'θ': '\\theta', 'λ': '\\lambda', 'μ': '\\mu', 'ρ': '\\rho', 'σ': '\\sigma',
@@ -819,7 +1113,7 @@ export function renderGlyphToSVGPath(
     '°': '\\degree', '±': '\\pm', '×': '\\times', '÷': '\\div',
     '≈': '\\approx', '≠': '\\ne', '≤': '\\le', '≥': '\\ge',
     '∂': '\\partial', '∇': '\\nabla', '∞': '\\infty', 'ħ': '\\hbar',
-    'π': '\\pi'
+    'π': '\\pi', '·': '\\cdot'
   };
   const lookupChar = aliasMap[char] || char;
 
@@ -858,6 +1152,108 @@ export function renderGlyphToSVGPath(
     }
   }
 
+  // If still no strokes, let's build using composite rules for international diacritics
+  if (!strokes || strokes.length === 0) {
+    const compositeInfo = getCompositeCharacterInfo(lookupChar);
+    if (compositeInfo) {
+      let baseStrokes: GlyphStrokes | null = null;
+      const baseChar = compositeInfo.base;
+      if (style?.glyphs?.[baseChar]) {
+        const customPath = style.glyphs[baseChar];
+        if (typeof customPath === 'string' && customPath.trim().length > 0) {
+          baseStrokes = parseSVGPathToStrokes(customPath);
+        }
+      }
+      if (!baseStrokes || baseStrokes.length === 0) {
+        baseStrokes = BASE_GLYPHS[baseChar];
+      }
+      if (baseStrokes && baseStrokes.length > 0) {
+        const cloned: GlyphStrokes = baseStrokes.map(st => st.map(p => [...p]));
+        const diacritics = getDiacriticStrokes(compositeInfo.diacritic, compositeInfo.isCapital);
+        strokes = [...cloned, ...diacritics];
+      }
+    }
+  }
+
+  // If still no strokes and the character is a multi-character ligature, synthesize it!
+  if ((!strokes || strokes.length === 0) && lookupChar.length > 1) {
+    let combinedStrokes: GlyphStrokes = [];
+    let shiftX = 0;
+    for (let c = 0; c < lookupChar.length; c++) {
+      const singleChar = lookupChar[c];
+      let singleStrokes: GlyphStrokes | null = null;
+      if (style?.glyphs?.[singleChar]) {
+        const customPath = style.glyphs[singleChar];
+        if (typeof customPath === 'string' && customPath.trim().length > 0) {
+          singleStrokes = parseSVGPathToStrokes(customPath);
+        }
+      }
+      if (!singleStrokes || singleStrokes.length === 0) {
+        singleStrokes = BASE_GLYPHS[singleChar];
+      }
+      if (!singleStrokes || singleStrokes.length === 0) {
+        const fallbackC = singleChar.toLowerCase();
+        if (BASE_GLYPHS[fallbackC]) {
+          singleStrokes = BASE_GLYPHS[fallbackC];
+        } else {
+          const fallbackU = singleChar.toUpperCase();
+          if (BASE_GLYPHS[fallbackU]) {
+            singleStrokes = BASE_GLYPHS[fallbackU];
+          }
+        }
+      }
+      if (singleStrokes && singleStrokes.length > 0) {
+        const adjustedStrokes = applyContextualDotAdjustments(
+          singleChar,
+          singleStrokes,
+          c > 0 ? lookupChar[c - 1] : prevUnit,
+          c < lookupChar.length - 1 ? lookupChar[c + 1] : nextUnit
+        );
+        const clonedShifted = adjustedStrokes.map(st => st.map(([px, py]) => [px + shiftX, py] as [number, number]));
+        
+        // Add a beautiful handwriting cursive connecting transition stroke from previous letter to the next
+        if (combinedStrokes.length > 0) {
+          const prevStroke = combinedStrokes[combinedStrokes.length - 1];
+          const nextStroke = clonedShifted[0];
+          if (prevStroke && prevStroke.length > 0 && nextStroke && nextStroke.length > 0) {
+            const lastPt = prevStroke[prevStroke.length - 1];
+            const firstPt = nextStroke[0];
+            
+            const isPrevApo = ['\'', '’', '‘', 'ʻ'].includes(lookupChar[c - 1]);
+            let connector: Array<[number, number]>;
+            if (isPrevApo) {
+              // The connector sweeps down from the tail of the apostrophe to the starting position of the next letter
+              const midX = lastPt[0] - 2;
+              const midY = (lastPt[1] + firstPt[1]) / 2 + 6;
+              connector = [
+                [lastPt[0], lastPt[1]],
+                [midX, midY],
+                [firstPt[0], firstPt[1]]
+              ];
+            } else {
+              const midX = lastPt[0] * 0.4 + firstPt[0] * 0.6;
+              const midY = Math.min(90, Math.max(lastPt[1], firstPt[1]) + 4);
+              connector = [
+                [lastPt[0], lastPt[1]],
+                [midX, midY],
+                [firstPt[0], firstPt[1]]
+              ];
+            }
+            combinedStrokes.push(connector);
+          }
+        }
+        
+        combinedStrokes = [...combinedStrokes, ...clonedShifted];
+        const isApostrophe = ['\'', '’', '‘', 'ʻ'].includes(singleChar);
+        const baseW = isApostrophe ? 8 : (['m', 'w', 'М', 'Ш', 'Щ', 'Ю', 'Ж', 'W', 'M'].includes(singleChar) ? 46 : 30);
+        shiftX += baseW;
+      }
+    }
+    if (combinedStrokes.length > 0) {
+      strokes = combinedStrokes;
+    }
+  }
+
   // Final fallback
   if (!strokes) {
     const defaultCoords: [number, number] = [startX, startY];
@@ -869,8 +1265,52 @@ export function renderGlyphToSVGPath(
     ];
   }
 
+  // Dynamic context-aware diacritical dot adjustment for single character renderings
+  if (strokes && strokes.length > 0 && lookupChar.length === 1) {
+    strokes = applyContextualDotAdjustments(lookupChar, strokes, prevUnit, nextUnit);
+  }
+
   // Clone strokes so we can safely add dynamic serif decorations if needed
   let finalStrokes: GlyphStrokes = strokes.map(stroke => stroke.map(pt => [...pt] as [number, number]));
+
+  // Prevent "stamp effect" on adjacent repeating identical letters (e.g., ll, ee, нн, сс, її)
+  // by applying asymmetric geometric deformations to make them look distinct and hand-drawn.
+  const isRepeatingDuplicate = !!(prevUnit && char.toLowerCase() === prevUnit.toLowerCase());
+  const isFirstOfDuplicate   = !!(nextUnit && char.toLowerCase() === nextUnit.toLowerCase());
+
+  if (isRepeatingDuplicate || isFirstOfDuplicate) {
+    // Determine dynamic deforms deterministically per position
+    let defX = 1.0;
+    let defY = 1.0;
+    let offsetShiftX = 0;
+    let offsetShiftY = 0;
+
+    if (isFirstOfDuplicate) {
+      // First character of the repeating pair: slightly taller, narrower, shifted slightly up
+      defX = 0.92;
+      defY = 1.06;
+      offsetShiftY = -3.5;
+      offsetShiftX = -1.5;
+    } else if (isRepeatingDuplicate) {
+      // Second character of the repeating pair: slightly shorter, wider, shifted slightly down
+      defX = 1.08;
+      defY = 0.91;
+      offsetShiftY = 3.5;
+      offsetShiftX = 1.5;
+    }
+
+    // Apply the deformation to finalStrokes (scaled around the logical center of the letter grid x=25, y=45)
+    finalStrokes = finalStrokes.map(stroke =>
+      stroke.map(([px, py]) => {
+        const dx = px - 25;
+        const dy = py - 45;
+        return [
+          25 + dx * defX + offsetShiftX,
+          45 + dy * defY + offsetShiftY
+        ] as [number, number];
+      })
+    );
+  }
 
   // Standard serif generation logic
   if (config.fontFamily === 'serif' && char !== ' ') {
@@ -930,7 +1370,13 @@ export function renderGlyphToSVGPath(
 
   // Calculate dynamic slant factor based on average slant of cursive
   // Plus minor tilt variance per character
-  const baseSlant = style ? style.slant : 0;
+  let baseSlant = style ? style.slant : 0;
+  if (isFirstOfDuplicate) {
+    baseSlant += 4.5; // Slight forward lean for first duplicate
+  } else if (isRepeatingDuplicate) {
+    baseSlant -= 4.5; // Slight backward/upright lean for second duplicate to create stylistic rhythm
+  }
+
   const slantAngleDeg = (baseSlant + config.tiltVariance * (Math.sin(charIndex * 1.5 + lineIndex * 2.3)));
   const slantRad = (slantAngleDeg * Math.PI) / 180;
   const slantFactor = Math.tan(slantRad);
@@ -946,9 +1392,15 @@ export function renderGlyphToSVGPath(
   
   // Determine actual width to allocate for this character
   // Default cell size on grid is 50, standard characters are scaled
-  const baseWidth = char === 'm' || char === 'w' || char === 'М' || char === 'Ш' ? 55 : 40;
+  const baseWidth = getUnitBaseWidth(char);
   const baseLetterSpacing = style ? style.letterSpacing : 0;
-  const targetCharWidth = (baseWidth * (size / 100)) + localSpacingOffset + config.letterSpacing + baseLetterSpacing;
+  let targetCharWidth = (baseWidth * (size / 100)) + localSpacingOffset + config.letterSpacing + baseLetterSpacing;
+
+  if (isFirstOfDuplicate) {
+    targetCharWidth *= 0.94; // slightly narrower allocation
+  } else if (isRepeatingDuplicate) {
+    targetCharWidth *= 1.06; // slightly wider allocation
+  }
 
   // Let's calculate absolute first & last connection coordinates of this glyph
   let firstPoint: [number, number] = [startX, startY + localBaselineOffset + (50 * (size / 100))];
@@ -1050,7 +1502,7 @@ export interface RenderedPage {
   lines: Array<{
     y: number;
     elements: Array<{
-      type: 'text' | 'latex';
+      type: 'text' | 'latex' | 'table';
       pathData?: string;
       char?: string;
       x: number;
@@ -1060,6 +1512,14 @@ export interface RenderedPage {
       useFont?: boolean;
       fontFamily?: string;
       rotation?: number;
+      isPrinted?: boolean;
+      isUnderlined?: boolean;
+      isLine?: boolean;
+      
+      // Table properties
+      tableStyle?: 'ruler' | 'handdrawn';
+      tableRows?: string[][];
+      tableHeight?: number;
     }>;
   }>;
 }
@@ -1086,12 +1546,124 @@ export function wrapTextIntoPages(
   let currentPageLines: RenderedPage['lines'] = [];
   let currentY = config.margins.top;
   let lineIndex = 0;
+  let activePrinted = false;
+  let activeUnderlined = false;
 
-  // Render text word-by-word into wrapped line models
-  lines.forEach((originalLine) => {
+  let i = 0;
+  while (i < lines.length) {
+    const originalLine = lines[i];
+    const trimmed = originalLine.trim();
+
+    // Check if line is a table specifier or markdown table starts
+    let tableStyle: 'ruler' | 'handdrawn' = 'handdrawn';
+    let isTableBlock = false;
+    let tableLines: string[] = [];
+
+    if (trimmed.startsWith('[table:ruler]') || trimmed.startsWith('[table:straight]')) {
+      tableStyle = 'ruler';
+      isTableBlock = true;
+      i++; // skip specifier line
+      while (i < lines.length && !lines[i].trim().includes('[endtable]')) {
+        const line = lines[i].trim();
+        if (line.startsWith('|')) {
+          tableLines.push(line);
+        }
+        i++;
+      }
+      if (i < lines.length && lines[i].trim().includes('[endtable]')) {
+        i++; // skip [endtable]
+      }
+    } else if (trimmed.startsWith('[table:handdrawn]') || trimmed.startsWith('[table:hand]')) {
+      tableStyle = 'handdrawn';
+      isTableBlock = true;
+      i++; // skip specifier line
+      while (i < lines.length && !lines[i].trim().includes('[endtable]')) {
+        const line = lines[i].trim();
+        if (line.startsWith('|')) {
+          tableLines.push(line);
+        }
+        i++;
+      }
+      if (i < lines.length && lines[i].trim().includes('[endtable]')) {
+        i++; // skip [endtable]
+      }
+    } else if (trimmed.startsWith('|')) {
+      // Automatic markdown table detection
+      tableStyle = 'handdrawn'; // default to handdrawn
+      isTableBlock = true;
+      while (i < lines.length) {
+        const line = lines[i].trim();
+        if (line.startsWith('|')) {
+          tableLines.push(line);
+          i++;
+        } else {
+          break;
+        }
+      }
+    }
+
+    if (isTableBlock && tableLines.length > 0) {
+      // Process tableLines into table row matrices
+      const rows: string[][] = [];
+      tableLines.forEach(tLine => {
+        // split by '|', but skip empty tokens on start/end
+        const cells = tLine.split('|')
+          .map(c => c.trim())
+          .filter((c, idx, arr) => {
+            if (idx === 0 && tLine.startsWith('|') && c === '') return false;
+            if (idx === arr.length - 1 && tLine.endsWith('|') && c === '') return false;
+            return true;
+          });
+        // Ignore lines that are just dashes (like |---|---| in markdown tables)
+        const isDashLine = cells.every(c => c.match(/^[- :]+$/));
+        if (!isDashLine && cells.length > 0) {
+          rows.push(cells);
+        }
+      });
+
+      if (rows.length > 0) {
+        // Calculate table element height
+        const rowHeight = config.lineSpacing * 1.6;
+        const tableHeight = rows.length * rowHeight;
+
+        // Page break check: if it doesn't fit, put the whole table on a new page
+        if (currentY + tableHeight > PAGE_HEIGHT - config.margins.bottom && currentPageLines.length > 0) {
+          pages.push({ lines: currentPageLines });
+          currentPageLines = [];
+          currentY = config.margins.top;
+        }
+
+        // Add table element
+        currentPageLines.push({
+          y: currentY,
+          elements: [{
+            type: 'table',
+            x: config.margins.left,
+            y: currentY,
+            width: maxLineWidth,
+            tableStyle: tableStyle,
+            tableRows: rows,
+            tableHeight: tableHeight
+          } as any]
+        });
+
+        currentY += tableHeight + config.lineSpacing; // add space after table
+        lineIndex++;
+
+        // Page break check
+        if (currentY + config.lineSpacing > PAGE_HEIGHT - config.margins.bottom) {
+          pages.push({ lines: currentPageLines });
+          currentPageLines = [];
+          currentY = config.margins.top;
+        }
+
+        continue;
+      }
+    }
+
     // Check if line is LaTeX formula
-    if (originalLine.trim().startsWith('$$') && originalLine.trim().endsWith('$$')) {
-      const formula = originalLine.trim().slice(2, -2).trim();
+    if (trimmed.startsWith('$$') && trimmed.endsWith('$$')) {
+      const formula = trimmed.slice(2, -2).trim();
       
       // Page break check
       if (currentY + config.lineSpacing * 1.8 > PAGE_HEIGHT - config.margins.bottom) {
@@ -1112,7 +1684,8 @@ export function wrapTextIntoPages(
       });
       currentY += Math.max(config.lineSpacing * 1.8, 55);
       lineIndex++;
-      return;
+      i++;
+      continue;
     }
 
     // Standard text wrapping
@@ -1128,19 +1701,17 @@ export function wrapTextIntoPages(
         return;
       }
 
-      // Calculate word layout width
       let wordWidth = 0;
       const charElements: Array<{ char: string; width: number; localOffset: number }> = [];
       
-      for (let i = 0; i < word.length; i++) {
-        const char = word[i];
-        const baseWidth = char === 'm' || char === 'w' || char === 'М' || char === 'Ш' ? 55 : 40;
+      const units = splitWordIntoUnits(word);
+      units.forEach((unit) => {
+        const baseWidth = getUnitBaseWidth(unit, style?.useFont);
         const widthVal = (baseWidth * (fontSize / 100)) + config.letterSpacing + styleLetterSpacing;
-        charElements.push({ char, width: widthVal, localOffset: wordWidth });
+        charElements.push({ char: unit, width: widthVal, localOffset: wordWidth });
         wordWidth += widthVal;
-      }
+      });
 
-      // If word exceeds margin, snap to new line
       if (currentX + wordWidth > PAGE_WIDTH - config.margins.right) {
         if (currentLineElements.length > 0) {
           currentPageLines.push({
@@ -1152,7 +1723,6 @@ export function wrapTextIntoPages(
           currentY += config.lineSpacing;
           lineIndex++;
 
-          // Page break check
           if (currentY + config.lineSpacing > PAGE_HEIGHT - config.margins.bottom) {
             pages.push({ lines: currentPageLines });
             currentPageLines = [];
@@ -1162,9 +1732,10 @@ export function wrapTextIntoPages(
         currentX = config.margins.left;
       }
 
-      // Generate paths for each letter in the word
       let lastCharEndPoint: [number, number] | null = null;
       charElements.forEach((el, index) => {
+        const prevU = index > 0 ? charElements[index - 1].char : undefined;
+        const nextU = index < charElements.length - 1 ? charElements[index + 1].char : undefined;
         const rendering = renderGlyphToSVGPath(
           el.char,
           currentX,
@@ -1174,7 +1745,9 @@ export function wrapTextIntoPages(
           index + currentLineElements.length,
           lineIndex,
           style,
-          lastCharEndPoint
+          lastCharEndPoint,
+          prevU,
+          nextU
         );
 
         if (rendering.useFont) {
@@ -1205,11 +1778,9 @@ export function wrapTextIntoPages(
         currentX += rendering.width;
       });
 
-      // Add word separator
       currentX += config.wordSpacing;
     });
 
-    // Push trailing leftover line
     if (currentLineElements.length > 0) {
       currentPageLines.push({
         y: currentY,
@@ -1218,14 +1789,15 @@ export function wrapTextIntoPages(
       currentY += config.lineSpacing;
       lineIndex++;
 
-      // Page break check
       if (currentY + config.lineSpacing > PAGE_HEIGHT - config.margins.bottom) {
         pages.push({ lines: currentPageLines });
         currentPageLines = [];
         currentY = config.margins.top;
       }
     }
-  });
+
+    i++;
+  }
 
   // Push final page
   if (currentPageLines.length > 0 || pages.length === 0) {
@@ -1246,6 +1818,484 @@ export interface MatchedFormulaItem {
   scale: number;
 }
 
+type MathNode =
+  | { type: 'row'; children: MathNode[] }
+  | { type: 'char'; char: string }
+  | { type: 'symbol'; seq: string }
+  | { type: 'frac'; num: MathNode; den: MathNode }
+  | { type: 'sqrt'; content: MathNode }
+  | { type: 'script'; base: MathNode; sub?: MathNode; sup?: MathNode }
+  | { type: 'bigOp'; op: string; sub?: MathNode; sup?: MathNode }
+  | { type: 'space' };
+
+function tokenizeLaTeX(expr: string): string[] {
+  const tokens: string[] = [];
+  let i = 0;
+  while (i < expr.length) {
+    const char = expr[i];
+    if (char === '\\') {
+      let seq = '\\';
+      i++;
+      while (i < expr.length && /[a-zA-Z]/.test(expr[i])) {
+        seq += expr[i];
+        i++;
+      }
+      tokens.push(seq);
+    } else if (/\s/.test(char)) {
+      tokens.push(' ');
+      i++;
+    } else if (/[0-9a-zA-Z={}()^_+*/.,;<>!?|:-]/.test(char)) {
+      tokens.push(char);
+      i++;
+    } else {
+      tokens.push(char);
+      i++;
+    }
+  }
+  return tokens.filter((t, idx, arr) => {
+    if (t === ' ' && arr[idx - 1] === ' ') return false;
+    return true;
+  });
+}
+
+const REVERSE_ALIAS_MAP: Record<string, string> = {
+  '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\Delta': 'Δ',
+  '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ', '\\rho': 'ρ', '\\sigma': 'σ',
+  '\\phi': 'φ', '\\psi': 'ψ', '\\omega': 'ω', '\\Omega': 'Ω',
+  '\\degree': '°', '\\pm': '±', '\\times': '×', '\\div': '÷',
+  '\\approx': '≈', '\\ne': '≠', '\\le': '≤', '\\ge': '≥',
+  '\\partial': '∂', '\\nabla': '∇', '\\infty': '∞', '\\hbar': 'ħ',
+  '\\pi': 'π', '\\int': '∫', '\\sum': 'Σ', '\\cdot': '·'
+};
+
+function parseLaTeXAST(expression: string): MathNode {
+  const tokens = tokenizeLaTeX(expression);
+  let pos = 0;
+
+  function peek(): string | undefined {
+    return tokens[pos];
+  }
+
+  function next(): string {
+    return tokens[pos++];
+  }
+
+  function parseRow(isGroup: boolean): MathNode {
+    const children: MathNode[] = [];
+    while (pos < tokens.length) {
+      const token = peek();
+      if (isGroup && token === '}') {
+        break;
+      }
+      if (token === '}' || token === ')') {
+        break;
+      }
+      children.push(parseNode());
+    }
+    if (children.length === 1) return children[0];
+    return { type: 'row', children };
+  }
+
+  function parseGroup(): MathNode {
+    if (peek() === '{') {
+      next(); // consume '{'
+      const node = parseRow(true);
+      if (peek() === '}') next(); // consume '}'
+      return node;
+    } else {
+      return parseNode();
+    }
+  }
+
+  function parseNode(): MathNode {
+    const token = next();
+    if (!token) return { type: 'char', char: '' };
+
+    if (token === ' ') {
+      return { type: 'space' };
+    }
+
+    const knownOps: Record<string, string> = {
+      '\\log': 'log',
+      '\\ln': 'ln',
+      '\\sin': 'sin',
+      '\\cos': 'cos',
+      '\\tan': 'tan',
+      '\\cot': 'cot',
+      '\\sec': 'sec',
+      '\\csc': 'csc',
+      '\\arcsin': 'arcsin',
+      '\\arccos': 'arccos',
+      '\\arctan': 'arctan',
+      '\\det': 'det',
+      '\\lim': 'lim',
+      '\\max': 'max',
+      '\\min': 'min'
+    };
+
+    if (knownOps[token]) {
+      const expanded = knownOps[token];
+      const children: MathNode[] = expanded.split('').map(c => ({ type: 'char', char: c }));
+      return { type: 'row', children };
+    }
+
+    if (token === '\\frac') {
+      const num = parseGroup();
+      const den = parseGroup();
+      return { type: 'frac', num, den };
+    }
+
+    if (token === '\\sqrt') {
+      const content = parseGroup();
+      return { type: 'sqrt', content };
+    }
+
+    if (token === '\\sum' || token === '\\int') {
+      const bigOpNode: MathNode & { type: 'bigOp' } = { type: 'bigOp', op: token };
+      while (peek() === '_' || peek() === '^') {
+        const scriptType = next();
+        const scriptVal = parseGroup();
+        if (scriptType === '_') {
+          bigOpNode.sub = scriptVal;
+        } else {
+          bigOpNode.sup = scriptVal;
+        }
+      }
+      return bigOpNode;
+    }
+
+    let baseNode: MathNode;
+    if (token.startsWith('\\')) {
+      baseNode = { type: 'symbol', seq: token };
+    } else if (token === '{') {
+      const node = parseRow(true);
+      if (peek() === '}') next();
+      baseNode = node;
+    } else {
+      baseNode = { type: 'char', char: token };
+    }
+
+    let sub: MathNode | undefined;
+    let sup: MathNode | undefined;
+    while (peek() === '_' || peek() === '^') {
+      const scriptType = next();
+      const scriptVal = parseGroup();
+      if (scriptType === '_') {
+        sub = scriptVal;
+      } else {
+        sup = scriptVal;
+      }
+    }
+
+    if (sub || sup) {
+      return { type: 'script', base: baseNode, sub, sup };
+    }
+
+    return baseNode;
+  }
+
+  return parseRow(false);
+}
+
+function buildLayout(
+  node: MathNode,
+  size: number,
+  actualConfig: PageConfig,
+  style: HandwritingStyle | undefined,
+  paths: Array<{ d: string; scale?: number; type?: string }>,
+  horizontalLines: Array<{ x1: number; y1: number; x2: number; y2: number; type?: string }>,
+  textElements: Array<{ char: string; x: number; y: number; fontSize: number; fontFamily?: string; rotation?: number }>
+): { width: number; ascent: number; descent: number; render: (x: number, y: number) => void } {
+  // Overriding useFont of math formula elements to false. Cursive web fonts (Marck Script, Caveat, etc.)
+  // do not contain custom handwriting glyphs for mathematical operators, summations, integrations, roots,
+  // or Greek letters, which leads to broken, missing, or misaligned blocky system print font fallbacks.
+  // Forcing useFont to false on activeStyle ensures all math formulas rendering always use highly detailed vector stroke shapes.
+  const activeStyle = style ? { ...style, useFont: false } : undefined;
+  style = activeStyle;
+  const useFont = false;
+
+  switch (node.type) {
+    case 'space': {
+      const w = size * 0.3;
+      return {
+        width: w,
+        ascent: size * 0.7,
+        descent: size * 0.2,
+        render: () => {}
+      };
+    }
+    
+    case 'char':
+    case 'symbol': {
+      const charStr = node.type === 'char' ? node.char : node.seq;
+      const glyphRes = renderGlyphToSVGPath(
+        charStr,
+        0,
+        0,
+        size,
+        actualConfig,
+        0,
+        1,
+        style
+      );
+
+      const w = glyphRes.width;
+      const asc = size * 0.75;
+      const desc = size * 0.25;
+
+      return {
+        width: w,
+        ascent: asc,
+        descent: desc,
+        render: (rx, ry) => {
+          if (useFont) {
+            const displayChar = REVERSE_ALIAS_MAP[charStr] || charStr;
+            textElements.push({
+              char: displayChar,
+              x: rx,
+              y: ry + (style?.baselineOffset || 0) * (size / 100),
+              fontSize: size,
+              fontFamily: style?.fontFamily,
+              rotation: glyphRes.rotation || 0
+            });
+          } else {
+            const drawRes = renderGlyphToSVGPath(
+              charStr,
+              rx,
+              ry,
+              size,
+              actualConfig,
+              0,
+              1,
+              style
+            );
+            if (drawRes.pathData) {
+              paths.push({ d: drawRes.pathData });
+            }
+          }
+        }
+      };
+    }
+
+    case 'row': {
+      const childrenLayouts = node.children.map(c => buildLayout(c, size, actualConfig, style, paths, horizontalLines, textElements));
+      let totalW = 0;
+      let maxAsc = 0;
+      let maxDesc = 0;
+
+      childrenLayouts.forEach(child => {
+        totalW += child.width;
+        if (child.ascent > maxAsc) maxAsc = child.ascent;
+        if (child.descent > maxDesc) maxDesc = child.descent;
+      });
+
+      return {
+        width: totalW,
+        ascent: maxAsc,
+        descent: maxDesc,
+        render: (rx, ry) => {
+          let currX = rx;
+          childrenLayouts.forEach(child => {
+            child.render(currX, ry);
+            currX += child.width;
+          });
+        }
+      };
+    }
+
+    case 'frac': {
+      const scaleFactor = 0.75;
+      const numLayout = buildLayout(node.num, size * scaleFactor, actualConfig, style, paths, horizontalLines, textElements);
+      const denLayout = buildLayout(node.den, size * scaleFactor, actualConfig, style, paths, horizontalLines, textElements);
+
+      const fracW = Math.max(numLayout.width, denLayout.width) + 12;
+      const lineGap = 4;
+      const asc = numLayout.ascent + numLayout.descent + lineGap + 3;
+      const desc = denLayout.ascent + denLayout.descent + lineGap + 3;
+
+      return {
+        width: fracW,
+        ascent: asc,
+        descent: desc,
+        render: (rx, ry) => {
+          const middleY = ry - 4;
+          horizontalLines.push({
+            x1: rx,
+            y1: middleY,
+            x2: rx + fracW,
+            y2: middleY,
+            type: 'fraction'
+          });
+
+          const numX = rx + (fracW - numLayout.width) / 2;
+          const numY = middleY - lineGap - numLayout.descent;
+          numLayout.render(numX, numY);
+
+          const denX = rx + (fracW - denLayout.width) / 2;
+          const denY = middleY + lineGap + denLayout.ascent;
+          denLayout.render(denX, denY);
+        }
+      };
+    }
+
+    case 'sqrt': {
+      const contentScale = 0.85;
+      const contentLayout = buildLayout(node.content, size * contentScale, actualConfig, style, paths, horizontalLines, textElements);
+      const hookW = 14;
+      const gapRight = 4;
+      const totalW = hookW + contentLayout.width + gapRight;
+      const extAsc = contentLayout.ascent + 5;
+      const desc = contentLayout.descent;
+
+      return {
+        width: totalW,
+        ascent: extAsc,
+        descent: desc,
+        render: (rx, ry) => {
+          const topY = ry - contentLayout.ascent - 3;
+          const bottomY = ry + contentLayout.descent;
+          contentLayout.render(rx + hookW, ry);
+
+          horizontalLines.push({
+            x1: rx + hookW - 1,
+            y1: topY,
+            x2: rx + totalW,
+            y2: topY,
+            type: 'root'
+          });
+
+          if (useFont) {
+            horizontalLines.push({ x1: rx + 2, y1: ry - 2, x2: rx + 5, y2: ry - 2, type: 'root' });
+            horizontalLines.push({ x1: rx + 5, y1: ry - 2, x2: rx + 8, y2: bottomY, type: 'root' });
+            horizontalLines.push({ x1: rx + 8, y1: bottomY, x2: rx + hookW - 1, y2: topY, type: 'root' });
+          } else {
+            const radicalRes = renderGlyphToSVGPath('\\sqrt', rx, ry - size*0.1, size*1.1, actualConfig, 0, 1, style);
+            if (radicalRes.pathData) {
+              paths.push({ d: radicalRes.pathData, type: 'root' });
+            } else {
+              horizontalLines.push({ x1: rx + 2, y1: ry - 2, x2: rx + 5, y2: ry - 2 });
+              horizontalLines.push({ x1: rx + 5, y1: ry - 2, x2: rx + 8, y2: bottomY });
+              horizontalLines.push({ x1: rx + 8, y1: bottomY, x2: rx + hookW - 1, y2: topY });
+            }
+          }
+        }
+      };
+    }
+
+    case 'script': {
+      const baseLayout = buildLayout(node.base, size, actualConfig, style, paths, horizontalLines, textElements);
+      const scriptScale = 0.6;
+      const supLayout = node.sup ? buildLayout(node.sup, size * scriptScale, actualConfig, style, paths, horizontalLines, textElements) : null;
+      const subLayout = node.sub ? buildLayout(node.sub, size * scriptScale, actualConfig, style, paths, horizontalLines, textElements) : null;
+
+      const rightWidth = Math.max(supLayout?.width || 0, subLayout?.width || 0);
+      const totalW = baseLayout.width + rightWidth + 2;
+      const asc = Math.max(baseLayout.ascent, supLayout ? (baseLayout.ascent + supLayout.ascent - 3) : 0);
+      const desc = Math.max(baseLayout.descent, subLayout ? (baseLayout.descent + subLayout.descent - 3) : 0);
+
+      return {
+        width: totalW,
+        ascent: asc,
+        descent: desc,
+        render: (rx, ry) => {
+          baseLayout.render(rx, ry);
+          if (supLayout) {
+            supLayout.render(rx + baseLayout.width + 1, ry - baseLayout.ascent + 5);
+          }
+          if (subLayout) {
+            subLayout.render(rx + baseLayout.width + 1, ry + baseLayout.descent - 2);
+          }
+        }
+      };
+    }
+
+    case 'bigOp': {
+      const isSum = node.op === '\\sum';
+      const opScale = isSum ? 1.3 : 1.5;
+      const opGlyphRes = renderGlyphToSVGPath(node.op, 0, 0, size * opScale, actualConfig, 0, 1, style);
+      const opW = opGlyphRes.width;
+      const opAsc = size * opScale * 0.75;
+      const opDesc = size * opScale * 0.25;
+
+      const limitScale = 0.55;
+      const supLayout = node.sup ? buildLayout(node.sup, size * limitScale, actualConfig, style, paths, horizontalLines, textElements) : null;
+      const subLayout = node.sub ? buildLayout(node.sub, size * limitScale, actualConfig, style, paths, horizontalLines, textElements) : null;
+
+      let totalW = opW;
+      let asc = opAsc;
+      let desc = opDesc;
+
+      if (isSum) {
+        const limitW = Math.max(supLayout?.width || 0, subLayout?.width || 0);
+        totalW = Math.max(opW, limitW) + 4;
+        if (supLayout) asc += supLayout.ascent + supLayout.descent + 3;
+        if (subLayout) desc += subLayout.ascent + subLayout.descent + 3;
+      } else {
+        const rightWidth = Math.max(supLayout?.width || 0, subLayout?.width || 0);
+        totalW = opW + rightWidth + 4;
+        if (supLayout) asc = Math.max(opAsc, opAsc + supLayout.ascent - 8);
+        if (subLayout) desc = Math.max(opDesc, opDesc + subLayout.descent - 4);
+      }
+
+      return {
+        width: totalW,
+        ascent: asc,
+        descent: desc,
+        render: (rx, ry) => {
+          const opX = isSum ? rx + (totalW - opW) / 2 : rx;
+          const opY = isSum ? ry : ry + 5;
+
+          if (useFont) {
+            const displayChar = REVERSE_ALIAS_MAP[node.op] || node.op;
+            textElements.push({
+              char: displayChar,
+              x: opX,
+              y: opY + (style?.baselineOffset || 0) * (size / 100),
+              fontSize: size * opScale,
+              fontFamily: style?.fontFamily,
+              rotation: opGlyphRes.rotation || 0
+            });
+          } else {
+            const drawRes = renderGlyphToSVGPath(node.op, opX, opY, size * opScale, actualConfig, 0, 1, style);
+            if (drawRes.pathData) {
+              const opType = node.op === '\\int' ? 'integral' : node.op === '\\sum' ? 'sum' : 'integral';
+              paths.push({ d: drawRes.pathData, type: opType });
+            }
+          }
+
+          if (isSum) {
+            if (supLayout) {
+              const supX = rx + (totalW - supLayout.width) / 2;
+              const supY = ry - opAsc - 4;
+              supLayout.render(supX, supY);
+            }
+            if (subLayout) {
+              const subX = rx + (totalW - subLayout.width) / 2;
+              const subY = ry + opDesc + subLayout.ascent + 2;
+              subLayout.render(subX, subY);
+            }
+          } else {
+            if (supLayout) {
+              supLayout.render(rx + opW - 2, ry - opAsc + 10);
+            }
+            if (subLayout) {
+              subLayout.render(rx + opW - 6, ry + opDesc + 2);
+            }
+          }
+        }
+      };
+    }
+
+    default:
+      return {
+        width: 0,
+        ascent: 0,
+        descent: 0,
+        render: () => {}
+      };
+  }
+}
+
 export function parseLaTeXFormula(
   expression: string,
   startX: number,
@@ -1253,14 +2303,15 @@ export function parseLaTeXFormula(
   size: number,
   config?: PageConfig,
   style?: HandwritingStyle
-): { paths: Array<{ d: string; scale?: number }>; horizontalLines: Array<{ x1: number; y1: number; x2: number; y2: number }> } {
-  const paths: Array<{ d: string; scale?: number }> = [];
-  const horizontalLines: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+): {
+  paths: Array<{ d: string; scale?: number; type?: string }>;
+  horizontalLines: Array<{ x1: number; y1: number; x2: number; y2: number; type?: string }>;
+  textElements: Array<{ char: string; x: number; y: number; fontSize: number; fontFamily?: string; rotation?: number }>;
+} {
+  const paths: Array<{ d: string; scale?: number; type?: string }> = [];
+  const horizontalLines: Array<{ x1: number; y1: number; x2: number; y2: number; type?: string }> = [];
+  const textElements: Array<{ char: string; x: number; y: number; fontSize: number; fontFamily?: string; rotation?: number }> = [];
 
-  // Let's create a beautiful custom handwritten layout based on expressions
-  // e.g. "f(x) = \int_{a}^{b} x^2 dx", "\frac{\alpha + \beta}{\gamma}" etc.
-  
-  let currentX = startX;
   const configPlaceholder: PageConfig = {
     paperType: 'blank',
     fontFamily: 'sans',
@@ -1281,136 +2332,13 @@ export function parseLaTeXFormula(
 
   const actualConfig = config ? { ...config, paperType: 'blank' as const, showMargins: false } : configPlaceholder;
 
-  // Simplistic Math parser
-  if (expression.includes('\\frac')) {
-    // Render fraction (numerator on top, line in middle, denominator below)
-    // Matches \frac{num}{den}
-    const match = expression.match(/\\frac\s*\{([^}]+)\}\s*\{([^}]+)\}/);
-    if (match) {
-      const num = match[1];
-      const den = match[2];
-
-      const numWidth = num.length * 15;
-      const denWidth = den.length * 15;
-      const fracWidth = Math.max(numWidth, denWidth) + 16;
-      const middleY = startY + size / 2;
-
-      // Draw horizontal dividing bar
-      horizontalLines.push({
-        x1: currentX,
-        y1: middleY,
-        x2: currentX + fracWidth,
-        y2: middleY
-      });
-
-      // Render numerator (top)
-      for (let i = 0; i < num.length; i++) {
-        const glyphRes = renderGlyphToSVGPath(
-          num[i],
-          currentX + (fracWidth - numWidth) / 2 + (i * 14),
-          startY - 5,
-          size * 0.85,
-          actualConfig,
-          i,
-          1,
-          style
-        );
-        if (glyphRes.pathData) {
-          paths.push({ d: glyphRes.pathData });
-        }
-      }
-
-      // Render denominator (bottom)
-      for (let i = 0; i < den.length; i++) {
-        const glyphRes = renderGlyphToSVGPath(
-          den[i],
-          currentX + (fracWidth - denWidth) / 2 + (i * 14),
-          startY + size * 0.72,
-          size * 0.85,
-          actualConfig,
-          i,
-          2,
-          style
-        );
-        if (glyphRes.pathData) {
-          paths.push({ d: glyphRes.pathData });
-        }
-      }
-      currentX += fracWidth;
-    }
-  } else if (expression.includes('\\int')) {
-    // Integrals! \int_{a}^{b} x dx
-    const glyphRes = renderGlyphToSVGPath('\\int', currentX, startY - 10, size * 1.5, actualConfig, 0, 1, style);
-    paths.push({ d: glyphRes.pathData });
-    currentX += 28;
-
-    // Integral bounds match can be captured
-    const subMatch = expression.match(/_\{?([^}]+)\}?\^\{?([^}]+)\}?/);
-    if (subMatch) {
-      const lower = subMatch[1];
-      const upper = subMatch[2];
-
-      // Lower bound
-      const lowGlyph = renderGlyphToSVGPath(lower, currentX - 10, startY + size * 1.1, size * 0.65, actualConfig, 0, 1, style);
-      paths.push({ d: lowGlyph.pathData });
-
-      // Upper bound
-      const upGlyph = renderGlyphToSVGPath(upper, currentX, startY - 20, size * 0.65, actualConfig, 0, 1, style);
-      paths.push({ d: upGlyph.pathData });
-    }
-
-    // Rest of formula (e.g. x^2 dx or standard expression)
-    const rest = expression.replace(/\\int(_\{[^}]+\})?(\^\{[^}]+\})?/, '').trim();
-    for (let i = 0; i < rest.length; i++) {
-      const char = rest[i];
-      if (char === '^') {
-        const powerChar = rest[i+1];
-        if (powerChar) {
-          const powerGlyph = renderGlyphToSVGPath(powerChar, currentX, startY - 12, size * 0.65, actualConfig, i, 1, style);
-          paths.push({ d: powerGlyph.pathData });
-          currentX += 14;
-          i++; // skip next char
-        }
-        continue;
-      }
-      const glyphRes = renderGlyphToSVGPath(char, currentX, startY + 10, size, actualConfig, i, 1, style);
-      if (glyphRes.pathData) {
-        paths.push({ d: glyphRes.pathData });
-      }
-      currentX += glyphRes.width;
-    }
-  } else {
-    // Ordinary horizontal text expression / LaTeX characters with subscripts and superscripts
-    for (let i = 0; i < expression.length; i++) {
-      const char = expression[i];
-      if (char === ' ') {
-        currentX += 10;
-        continue;
-      }
-
-      // Handle simple script tokens
-      if (char === '^' && expression[i+1]) {
-        const pGlyph = renderGlyphToSVGPath(expression[i+1], currentX, startY - 10, size * 0.65, actualConfig, i, 1, style);
-        paths.push({ d: pGlyph.pathData });
-        currentX += 15;
-        i++;
-        continue;
-      }
-      if (char === '_' && expression[i+1]) {
-        const sGlyph = renderGlyphToSVGPath(expression[i+1], currentX, startY + size * 0.65, size * 0.65, actualConfig, i, 1, style);
-        paths.push({ d: sGlyph.pathData });
-        currentX += 15;
-        i++;
-        continue;
-      }
-
-      const glyphRes = renderGlyphToSVGPath(char, currentX, startY + 5, size, actualConfig, i, 1, style);
-      if (glyphRes.pathData) {
-        paths.push({ d: glyphRes.pathData });
-      }
-      currentX += glyphRes.width;
-    }
+  try {
+    const ast = parseLaTeXAST(expression);
+    const layout = buildLayout(ast, size, actualConfig, style, paths, horizontalLines, textElements);
+    layout.render(startX, startY);
+  } catch (err) {
+    console.error("LaTeX rendering failed:", err);
   }
 
-  return { paths, horizontalLines };
+  return { paths, horizontalLines, textElements };
 }

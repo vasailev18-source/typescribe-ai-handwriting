@@ -129,11 +129,20 @@ export default function TelegramSimulator({
 
   const inkColorHex = {
     blue: '#2b52b2',
-    black: '#1f1f21',
-    red: '#b82121',
-    purple: '#65239a',
-    green: '#1b633d'
-  }[config.inkColor];
+    black: '#17171a',
+    red: '#c91818',
+    purple: '#5c2090',
+    green: '#14612d',
+    pink: '#e3305d',
+    orange: '#ea580c',
+    yellow: '#f4af00',
+    brown: '#7a431d',
+    grey: '#4d4f52',
+    pencil: '#4d4f52',
+    'felt-blue': '#1e5dfc',
+    'felt-pink': '#f43f5e',
+    'marker-yellow': '#eab308'
+  }[config.inkColor] || config.inkColor || '#2b52b2';
 
   // Wrap text coordinates for simple mini preview inside message bubble
   const getMiniHandwritingPreview = (text: string) => {
@@ -307,18 +316,47 @@ export default function TelegramSimulator({
                                 {/* Render lines in mini canvas */}
                                 {miniPreview.lines.map((line, lIdx) => (
                                   <g key={lIdx}>
-                                    {line.elements.map((el, eIdx) => (
-                                      <path 
-                                        key={eIdx} 
-                                        d={el.pathData} 
-                                        fill="none" 
-                                        stroke={inkColorHex} 
-                                        strokeWidth={config.strokeThickness * 1.5} 
-                                        strokeLinecap="round" 
-                                        strokeLinejoin="round" 
-                                        opacity="0.95"
-                                      />
-                                    ))}
+                                    {line.elements.map((el, eIdx) => {
+                                      if (el.type === 'table') {
+                                        return (
+                                          <g key={eIdx} stroke={inkColorHex} strokeWidth="1.2" opacity="0.65" fill="none">
+                                            <rect x="80" y={line.y - 15} width="180" height="32" rx="3" />
+                                            <line x1="80" y1={line.y} x2="260" y2={line.y} />
+                                            <line x1="170" y1={line.y - 15} x2="170" y2={line.y + 17} />
+                                          </g>
+                                        );
+                                      }
+
+                                      let baseThickness = config.strokeThickness * 0.75;
+                                      let baseOpacity = 0.95;
+                                      let strokeLinecap: 'round' | 'square' = 'round';
+                                      
+                                      const activeTool = config.toolType || (config.inkColor === 'pencil' ? 'pencil' : config.inkColor === 'marker-yellow' ? 'marker' : config.inkColor.startsWith('felt') ? 'felt' : 'pen');
+
+                                      if (activeTool === 'pencil') {
+                                        baseOpacity = 0.72;
+                                      } else if (activeTool === 'colored-pencil') {
+                                        baseOpacity = 0.82;
+                                      } else if (activeTool === 'felt') {
+                                        baseOpacity = 0.92;
+                                      } else if (activeTool === 'marker') {
+                                        baseOpacity = 0.44;
+                                        strokeLinecap = 'square';
+                                      }
+
+                                      return (
+                                        <path 
+                                          key={eIdx} 
+                                          d={el.pathData} 
+                                          fill="none" 
+                                          stroke={inkColorHex} 
+                                          strokeWidth={baseThickness} 
+                                          strokeLinecap={strokeLinecap} 
+                                          strokeLinejoin="round" 
+                                          opacity={baseOpacity}
+                                        />
+                                      );
+                                    })}
                                   </g>
                                 ))}
                               </svg>

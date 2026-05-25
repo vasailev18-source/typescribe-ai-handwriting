@@ -21,21 +21,108 @@ import {
   Fingerprint, 
   HelpCircle,
   Minimize2,
-  Maximize2
+  Maximize2,
+  Table2,
+  Plus,
+  PlusCircle,
+  RotateCcw
 } from 'lucide-react';
+
+export const TOOL_META = {
+  pen: {
+    min: 0.5,
+    max: 2.5,
+    step: 0.1,
+    default: 1.2,
+    label: 'ТОЛЩИНА СТЕРЖНЯ',
+    desc: '🖋️ Насыщенный чернильный стержень (шарик/перо) 0.5 - 1.0мм',
+    colors: ['blue', 'black', 'purple', 'red', 'green', 'brown']
+  },
+  felt: {
+    min: 2.0,
+    max: 8.0,
+    step: 0.2,
+    default: 4.5,
+    label: 'ТОЛЩИНА ФЛОМАСТЕРА',
+    desc: '🖍️ Пористый круглый наконечник фломастера 2.0 - 4.5мм',
+    colors: ['blue', 'black', 'red', 'green', 'purple', 'pink', 'orange', 'yellow', 'brown']
+  },
+  pencil: {
+    min: 0.5,
+    max: 2.5,
+    step: 0.1,
+    default: 1.1,
+    label: 'ГРИФЕЛЬ КАРАНДАША',
+    desc: '✏️ Классический графитовый грифель (HB). Автоматически выбирает серый цвет.',
+    colors: ['grey']
+  },
+  'colored-pencil': {
+    min: 0.8,
+    max: 3.5,
+    step: 0.1,
+    default: 1.5,
+    label: 'ГРИФЕЛЬ ЦВЕТНОГО КАРАНДАША',
+    desc: '🎨 Мягкий цветной карандашный грифель с матовой текстурой.',
+    colors: ['blue', 'black', 'red', 'green', 'purple', 'pink', 'orange', 'yellow', 'brown']
+  },
+  marker: {
+    min: 8.0,
+    max: 30.0,
+    step: 0.5,
+    default: 15.0,
+    label: 'ШИРИНА СКОСА МАРКЕРА',
+    desc: '⚡ Широкое срезанное перо скошенного маркера для выделения.',
+    colors: ['yellow', 'pink', 'green', 'orange', 'blue', 'purple']
+  }
+} as const;
+
+export const PALETTE_COLORS = [
+  { id: 'blue', hex: '#1d3f94', name: 'Синий', bgClass: 'bg-[#1d3f94]' },
+  { id: 'black', hex: '#17171a', name: 'Черный', bgClass: 'bg-[#17171a]' },
+  { id: 'purple', hex: '#5c2090', name: 'Фиолетовый', bgClass: 'bg-[#5c2090]' },
+  { id: 'red', hex: '#c91818', name: 'Красный', bgClass: 'bg-[#c91818]' },
+  { id: 'green', hex: '#14612d', name: 'Зеленый', bgClass: 'bg-[#14612d]' },
+  { id: 'pink', hex: '#e3305d', name: 'Розовый', bgClass: 'bg-[#e3305d]' },
+  { id: 'orange', hex: '#ea580c', name: 'Оранжевый', bgClass: 'bg-[#ea580c]' },
+  { id: 'yellow', hex: '#f4af00', name: 'Желтый', bgClass: 'bg-[#f4af00]' },
+  { id: 'brown', hex: '#7a431d', name: 'Коричневый', bgClass: 'bg-[#7a431d]' },
+  { id: 'grey', hex: '#4d4f52', name: 'Графитовый', bgClass: 'bg-[#4d4f52]' },
+] as const;
+
+export const OFFICE_THEME_COLUMNS = [
+  { name: 'Ч/Б', base: '#ffffff', shades: ['#ffffff', '#f2f2f2', '#d9d9d9', '#bfbfbf', '#a6a6a6', '#7f7f7f'] },
+  { name: 'Текст', base: '#17171a', shades: ['#f3f4f6', '#e5e7eb', '#d1d5db', '#9ca3af', '#4b5563', '#111827'] },
+  { name: 'Синий', base: '#1d3f94', shades: ['#dbeafe', '#bfdbfe', '#93c5fd', '#3b82f6', '#1d3f94', '#172554'] },
+  { name: 'Чернильный', base: '#3b82f6', shades: ['#eff6ff', '#dbeafe', '#bfdbfe', '#60a5fa', '#2563eb', '#1e40af'] },
+  { name: 'Красный', base: '#c91818', shades: ['#fef2f2', '#fee2e2', '#fca5a5', '#f87171', '#c91818', '#7f1d1d'] },
+  { name: 'Зеленый', base: '#14612d', shades: ['#f0fdf4', '#dcfce7', '#86efac', '#4ade80', '#14612d', '#064e3b'] },
+  { name: 'Фиолетовый', base: '#5c2090', shades: ['#faf5ff', '#f3e8ff', '#e9d5ff', '#c084fc', '#5c2090', '#4a044e'] },
+  { name: 'Розовый', base: '#e3305d', shades: ['#fdf2f8', '#fce7f3', '#fbcfe8', '#f472b6', '#e3305d', '#831843'] },
+  { name: 'Оранжевый', base: '#ea580c', shades: ['#fff7ed', '#ffedd5', '#fed7aa', '#fb923c', '#ea580c', '#7c2d12'] },
+  { name: 'Желтый', base: '#f4af00', shades: ['#fefbeb', '#fef3c7', '#fde68a', '#fcd34d', '#f4af00', '#78350f'] }
+];
+
+export const OFFICE_STANDARD_COLORS = [
+  '#c00000',
+  '#ff0000',
+  '#ffc000',
+  '#ffff00',
+  '#92d050',
+  '#00b050',
+  '#00b0f0',
+  '#0070c0',
+  '#002060',
+  '#7030a0'
+];
+
+// Helper to bridge old/new properties safely
+export const getToolThicknessMeta = (inkColor: string, toolType?: string) => {
+  const activeTool = (toolType || (inkColor === 'pencil' ? 'pencil' : inkColor === 'marker-yellow' ? 'marker' : inkColor.startsWith('felt') ? 'felt' : 'pen')) as keyof typeof TOOL_META;
+  return TOOL_META[activeTool] || TOOL_META.pen;
+};
 
 // Default preloaded handwriting presets (containing beautiful parameters)
 const DEFAULT_PRESETS: HandwritingStyle[] = [
-  {
-    id: 'elegant-cursive',
-    name: 'Изящный Курсив (Людмила С.)',
-    creator: 'Людмила С.',
-    description: 'Красивые наклонные прописные буквы, высокая разборчивость с классическими плавными линиями.',
-    slant: 12,
-    letterSpacing: 1.5,
-    baselineOffset: 0,
-    glyphs: {} // procedural rendering captures default paths
-  },
   {
     id: 'caveat-font',
     name: 'Школьный Кавеат (Ольга К.)',
@@ -344,13 +431,100 @@ const STYLE_CONFIG_PRESETS: Record<string, Partial<PageConfig>> = {
   }
 };
 
+const getFontLabel = (styleId: string, stylesList: HandwritingStyle[]): string => {
+  const index = stylesList.findIndex(s => s.id === styleId);
+  const num = index !== -1 ? index + 1 : 1;
+  const numStr = num < 10 ? `0${num}` : `${num}`;
+  
+  if (styleId === 'caveat-font') {
+    return `Шрифт #${numStr} + KZ`;
+  }
+  return `Шрифт #${numStr}`;
+};
+
+const getFontFlags = (styleId: string): string[] => {
+  if (styleId === 'caveat-font') {
+    return ['🇺🇦', '🇬🇧', '🇷🇺', '🇰🇿'];
+  }
+  return ['🇺🇦', '🇬🇧', '🇷🇺'];
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<'generate' | 'studio' | 'telegram'>('generate');
   
   // Custom Styles state
   const [styles, setStyles] = useState<HandwritingStyle[]>(DEFAULT_PRESETS);
-  const [selectedStyleId, setSelectedStyleId] = useState<string>('elegant-cursive');
+  const [selectedStyleId, setSelectedStyleId] = useState<string>('caveat-font');
   const activeStyle = styles.find(s => s.id === selectedStyleId) || styles[0];
+
+  // Interface for custom user signatures associated with fonts
+  interface SignatureItem {
+    id: string;
+    name: string;      // Person's name/surname/label
+    signature: string; // The physical handwriting string to render
+  }
+
+  const [fontSignatures, setFontSignatures] = useState<Record<string, SignatureItem[]>>(() => {
+    const saved = localStorage.getItem('handwriting_font_signatures');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return {
+      'caveat-font': [
+        { id: 's1', name: 'Александр Климов (директор)', signature: 'А.Климов' },
+        { id: 's2', name: 'Елена Соколова (бухгалтер)', signature: 'Е.Соколова' }
+      ]
+    };
+  });
+
+  const [selectedSignatureIds, setSelectedSignatureIds] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('handwriting_selected_signature_ids');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem('handwriting_font_signatures', JSON.stringify(fontSignatures));
+  }, [fontSignatures]);
+
+  useEffect(() => {
+    localStorage.setItem('handwriting_selected_signature_ids', JSON.stringify(selectedSignatureIds));
+  }, [selectedSignatureIds]);
+
+  const getStyleSignatures = (styleId: string): SignatureItem[] => {
+    if (fontSignatures[styleId] && fontSignatures[styleId].length > 0) {
+      return fontSignatures[styleId];
+    }
+    const index = styles.findIndex(s => s.id === styleId);
+    const num = index !== -1 ? index + 1 : 1;
+    return [
+      { id: `${styleId}-def-1`, name: `Иван Смирнов (Шрифт #${num})`, signature: 'И.Смирнов' },
+      { id: `${styleId}-def-2`, name: `Ольга Павлова (Шрифт #${num})`, signature: 'Павлова' }
+    ];
+  };
+
+  const currentSignatures = getStyleSignatures(activeStyle.id);
+  const activeSigId = selectedSignatureIds[activeStyle.id] || currentSignatures[0]?.id;
+  const activeSignature = currentSignatures.find(s => s.id === activeSigId) || currentSignatures[0];
+
+  // Font Selection Dropdown toggle and states
+  const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [fontsInfoModal, setFontsInfoModal] = useState(false);
+  
+  // Custom Color Palette sub-tabs and picker state
+  const [colorTab, setColorTab] = useState<'ink' | 'outline'>('ink');
+  const [customHexInput, setCustomHexInput] = useState('');
 
   // Sheet configuration state
   const [config, setConfig] = useState<PageConfig>({
@@ -373,19 +547,95 @@ export default function App() {
     paperEffect: 'none'
   });
 
+  // Synchronize Custom Hex Input with active color values (Ink color vs. Text outline)
+  useEffect(() => {
+    const activeColor = colorTab === 'ink' 
+      ? config.inkColor 
+      : (config.textOutlineColor || '');
+    
+    // Convert named preset back to true hex for the HTML native color picker
+    const resolvedHex = {
+      blue: '#1d3f94',
+      black: '#17171a',
+      red: '#c91818',
+      purple: '#5c2090',
+      green: '#14612d',
+      pink: '#e3305d',
+      orange: '#ea580c',
+      yellow: '#f4af00',
+      brown: '#7a431d',
+      grey: '#4d4f52',
+      pencil: '#4d4f52',
+      'felt-blue': '#1e5dfc',
+      'felt-pink': '#f43f5e',
+      'marker-yellow': '#eab308'
+    }[activeColor as string] || activeColor;
+
+    if (resolvedHex && resolvedHex.startsWith('#')) {
+      setCustomHexInput(resolvedHex);
+    } else {
+      setCustomHexInput('#ffffff');
+    }
+  }, [colorTab, config.inkColor, config.textOutlineColor]);
+
   // Source text inputs
   const [textInput, setTextInput] = useState<string>(
-    `Дорогой друг! Добро пожаловать.\nЭто MVP система синтеза рукописного текста.\n\nПочерк реалистично варьирует наклон и высоту каждой буквы!\nSupport for uppercase & lowercase English: Happy Handwriting!\n\nВы можете вставлять формулы LaTeX прямо на лист:\n$$ \\frac{\\alpha + \\beta}{x^2} $$\n\nЖелаем успехов в учебе и работе!\n- Команда TypeScribe`
+    `Привет! Данный текст демонстрирует различные каллиграфические возможности синтеза, включая сложные кириллические связки и физико-математические формулы.
+
+1. Тестирование соединений и «заборного» эффекта (с защитой от «эффекта штампа» для повторяющихся нн, сс, ее, лл, оо):
+• лишишься (проверка заборного эффекта ш—и—ш—ь—с—я)
+• минимум (проверка букв м—и—н—и—м—у—м)
+• съешьте (проверка букв с хвостиками и верхних выносов с, ъ, е, ш, ь, т, е)
+• длинный, касса, аллея, воодушевление, ассоциация (каждая из двойных букв нн, сс, лл, оо, ее деформируется асимметрично, заменяя «штамп» на живой человеческий почерк)
+• жужжание / филиал (сложная анатомия жж, фл, фи, буквы с хвостиками з, ц, щ, д, у)
+• бытие / вьюга / объявление / соловьи (связки с ь, ъ, ы: ые, ью, ья, ье, ьо, ыи)
+
+2. Украинские связки и сложные анатомические группы (включая защиту от наложений точек її/їй/бё/ъё):
+• дзиґа / джміль (проверка связок дз, дж, букв ґ и і)
+• її, їй, ії (проверка защиты от слияния точек-вредителей через чередующийся сдвиг)
+• бё, ъё (проверка защиты от срезания точек длинными верхними хвостами букв б и ъ)
+• з’їв, комп’ютер, подвір’я (проверка контекстной бесшовной связки после апострофа: ’я, ’ю, ’є, ’ї)
+
+3. English Handwriting & Continuous Ligatures:
+• difficult affiliation (testing connections of ff, fi, fl, ft)
+• theology of the shining choir (connections of th, te, sh, ch, of, to)
+• different opinion and treatment (connections of er, en, on, an, in, is, it, yo, re)
+• sketchy feelings of commitment (testing ch, ck, oo, ll, tt, ment, ing, ion)
+
+4. Демонстрация продвинутых физико-математических формул:
+Вы можете вписывать сложные многоэтажные формулы LaTeX прямо на лист в формате двойных знаков доллара:
+
+$$ \int_{a}^{b} x^2 dx = \frac{b^3 - a^3}{3} $$
+
+$$ \sum_{n=1}^{\infty} \frac{\theta + \lambda}{\mu^2} $$
+
+$$ x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a} $$
+
+$$ \psi(x, t) = \alpha \cdot e^{i(kx - \omega t)} $$
+
+$$ \Delta = e^2 + \frac{\alpha + \gamma}{\delta \cdot \sigma} $$
+
+$$ \sin^2(\theta) + \cos^2(\theta) = 1 $$
+
+$$ \lim_{n \to \infty} \left(1 + \frac{1}{n}\right)^n = e $$
+
+$$ \log_2(x) + \ln(y) = \tan(\phi) $$
+
+Желаем продуктивной работы с Handwriting AI!`
   );
 
   const [fontSize, setFontSize] = useState<number>(24);
-  const [signatureName, setSignatureName] = useState<string>('А. Климов');
   const [showSignature, setShowSignature] = useState<boolean>(true);
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
+  const [newSigName, setNewSigName] = useState<string>('');
+  const [newSigText, setNewSigText] = useState<string>('');
+
+  // Get active signature text
+  const activeSignatureText = activeSignature ? activeSignature.signature : '';
 
   // Generate layouts
   const renderedPages = wrapTextIntoPages(
-    textInput + (showSignature ? `\n\n\n\n\n\n\n\n\n                                                   ${signatureName}` : ''),
+    textInput + (showSignature && activeSignatureText ? `\n\n\n\n\n\n\n\n\n                                                   ${activeSignatureText}` : ''),
     config,
     activeStyle,
     fontSize
@@ -401,6 +651,13 @@ export default function App() {
 
   const insertLaTeXTemplate = (template: string) => {
     setTextInput(prev => prev + `\n$$ ${template} $$`);
+  };
+
+  const insertTableTemplate = (type: 'ruler' | 'handdrawn') => {
+    const template = type === 'ruler'
+      ? `\n[table:ruler]\n| Товар | Кол-во | Цена |\n| Хлеб  | 1      | 50р  |\n| Молоко| 2      | 90р  |\n[endtable]\n`
+      : `\n[table:handdrawn]\n| Товар | Кол-во | Цена |\n| Книга | 1      | 450р |\n| Ручка | 3      | 30р  |\n[endtable]\n`;
+    setTextInput(prev => prev + template);
   };
 
   const handleAISummarize = async () => {
@@ -485,42 +742,202 @@ export default function App() {
             >
               {/* Left Column Controls */}
               <div className="lg:col-span-5 flex flex-col gap-6">
-                
-                {/* Handwriting Selection Panel */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">
-                    Выберите стиль почерка
-                  </span>
-                  
-                  <div className="flex flex-col gap-2 mt-3">
-                    {styles.map(style => (
-                      <button
-                        key={style.id}
-                        onClick={() => {
-                          setSelectedStyleId(style.id);
-                          const preset = STYLE_CONFIG_PRESETS[style.id];
-                          if (preset) {
-                            setConfig(prev => ({ ...prev, ...preset }));
-                          }
-                        }}
-                        className={`w-full flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all cursor-pointer ${
-                          selectedStyleId === style.id
-                            ? 'bg-blue-50/50 border-blue-500 text-blue-900'
-                            : 'bg-white border-gray-100 hover:border-gray-200 text-gray-700'
-                        }`}
-                      >
-                        <div className="w-5 h-5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">
+
+                {/* Handwriting Selection Panel with Elegant Dropdown */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm relative z-35 font-sans" id="handwriting-dropdown-panel">
+                  <div className="flex items-center justify-between mb-3 border-b border-gray-50 pb-2">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
+                      Выберите стиль почерка
+                    </span>
+                    <span className="text-[10px] bg-slate-100 text-slate-600 font-extrabold px-2 py-0.5 rounded-full uppercase">
+                      Всего: {styles.length}
+                    </span>
+                  </div>
+
+                  {/* Dropdown Display Button */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsFontDropdownOpen(!isFontDropdownOpen)}
+                      className="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl p-3 px-3.5 transition-all cursor-pointer text-left shadow-xs hover:shadow-sm group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center font-bold text-base select-none group-hover:scale-105 transition-transform">
                           ✍️
                         </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between items-center mb-0.5">
-                            <span className="text-xs font-bold">{style.name}</span>
-                            <span className="text-[9.5px] font-semibold text-gray-400">от {style.creator}</span>
+                        <div>
+                          <div className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">
+                            Активный шрифт
                           </div>
-                          <p className="text-[11px] text-gray-500 leading-normal font-medium">{style.description}</p>
+                          <div className="text-xs font-bold text-slate-800 leading-tight">
+                            {getFontLabel(activeStyle.id, styles)}
+                          </div>
                         </div>
-                      </button>
-                    ))}
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          {getFontFlags(activeStyle.id).map((flag, idx) => (
+                            <span key={idx} className="text-xs filter drop-shadow-xs">{flag}</span>
+                          ))}
+                        </div>
+                        <span className={`text-slate-400 transition-transform duration-300 text-[10px] ${isFontDropdownOpen ? 'rotate-180 text-purple-500' : ''}`}>
+                          ▼
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Absolute Dropdown Overlay */}
+                    {isFontDropdownOpen && (
+                      <>
+                        {/* Outside click handler backdrop */}
+                        <div 
+                          className="fixed inset-0 z-40 cursor-default"
+                          onClick={() => setIsFontDropdownOpen(false)} 
+                        />
+                        
+                        <div className="absolute top-[102%] left-0 right-0 z-50 bg-white border border-slate-200/95 shadow-xl rounded-2xl p-2.5 mt-1 max-h-[360px] overflow-hidden flex flex-col animate-fade-in">
+                          {/* Sorter / Category Header */}
+                          <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 mb-1.5">
+                            <span>По дате добавления</span>
+                            <span className="text-purple-500">▼</span>
+                          </div>
+
+                          {/* Font List Container */}
+                          <div className="flex-1 overflow-y-auto pr-1 space-y-1 scrollbar-none">
+                            {styles.map(style => {
+                              const isSelected = style.id === selectedStyleId;
+                              const fontLabel = getFontLabel(style.id, styles);
+                              const flags = getFontFlags(style.id);
+                              
+                              // Determine display typography based on the font-family configuration
+                              const fontStyleObj = style.useFont && style.fontFamily 
+                                ? { fontFamily: style.fontFamily } 
+                                : { fontFamily: '"Marck Script", "Caveat", cursive', fontStyle: 'italic' as const };
+
+                              return (
+                                <button
+                                  key={style.id}
+                                  onClick={() => {
+                                    setSelectedStyleId(style.id);
+                                    const preset = STYLE_CONFIG_PRESETS[style.id];
+                                    if (preset) {
+                                      setConfig(prev => ({ ...prev, ...preset }));
+                                    }
+                                    setIsFontDropdownOpen(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between p-2 rounded-xl transition-all cursor-pointer text-left ${
+                                    isSelected 
+                                      ? 'bg-purple-50/80 border border-purple-200/50' 
+                                      : 'hover:bg-slate-50 border border-transparent'
+                                  }`}
+                                >
+                                  <div>
+                                    <div 
+                                      className={`text-sm font-bold text-slate-800 leading-tight tracking-normal mb-0.5 ${
+                                        isSelected ? 'text-purple-700' : 'text-slate-800'
+                                      }`}
+                                      style={fontStyleObj}
+                                    >
+                                      {fontLabel}
+                                    </div>
+                                    <div className="text-[9px] text-slate-400 font-bold leading-none">
+                                      от {style.creator}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 pl-2">
+                                    {flags.map((flag, idx) => (
+                                      <span key={idx} className="text-xs tracking-tighter filter drop-shadow-xs">{flag}</span>
+                                    ))}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Horizontal divider */}
+                          <div className="h-px bg-slate-100 my-1.5" />
+
+                          {/* Bottom Action Panel */}
+                          <div className="flex flex-col gap-1 px-0.5">
+                            <button
+                              onClick={async () => {
+                                if (isLoadingMore) return;
+                                setIsLoadingMore(true);
+                                // Simulation of loading extra premium handwritten styles
+                                await new Promise(resolve => setTimeout(resolve, 800));
+                                
+                                // Inject custom mock styles to satisfy the "load more" screen behavior
+                                const premiumStyles: HandwritingStyle[] = [
+                                  {
+                                    id: 'premium-script-48',
+                                    name: 'Каллиграфия #48 (Анастасия Г.)',
+                                    creator: 'Анастасия Г.',
+                                    description: 'Высокохудожественный стиль с летящими росчерками.',
+                                    slant: 11,
+                                    letterSpacing: 2,
+                                    baselineOffset: 1,
+                                    glyphs: {},
+                                    useFont: true,
+                                    fontFamily: 'Playpen Sans'
+                                  },
+                                  {
+                                    id: 'premium-kalam-36',
+                                    name: 'Чернила Калам #36 (Нурлан Б.)',
+                                    creator: 'Нурлан Б.',
+                                    description: 'Выразительный казахский почерк широким пером.',
+                                    slant: 5,
+                                    letterSpacing: 3,
+                                    baselineOffset: -1,
+                                    glyphs: {},
+                                    useFont: true,
+                                    fontFamily: 'Kalam'
+                                  }
+                                ];
+                                
+                                setStyles(prev => {
+                                  // filter existing to avoid duplicate loading keys
+                                  const filtered = prev.filter(s => !s.id.startsWith('premium-'));
+                                  return [...filtered, ...premiumStyles];
+                                });
+                                setIsLoadingMore(false);
+                              }}
+                              disabled={isLoadingMore}
+                              className="w-full text-center text-[10px] font-bold text-blue-600 hover:text-blue-700 py-1 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                            >
+                              {isLoadingMore ? (
+                                <>
+                                  <span className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></span>
+                                  <span>Загрузка шрифтов...</span>
+                                </>
+                              ) : (
+                                <span>Загрузить остальные шрифты...</span>
+                              )}
+                            </button>
+
+                            <div className="grid grid-cols-2 gap-1.5 mt-1">
+                              <button
+                                onClick={() => setFontsInfoModal(true)}
+                                className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 font-bold text-[10px] py-1 px-2 rounded-lg transition-all text-center cursor-pointer"
+                              >
+                                Подробнее
+                              </button>
+                              
+                              <button
+                                onClick={() => {
+                                  setIsFontDropdownOpen(false);
+                                  setActiveTab('studio');
+                                }}
+                                className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] py-1 px-2 rounded-lg transition-all text-center cursor-pointer shadow-xs shadow-purple-500/10"
+                              >
+                                Добавить шрифт
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -581,6 +998,28 @@ export default function App() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Table Templates */}
+                  <div className="mt-4 pt-3 border-t border-gray-100">
+                    <span className="text-[10px] uppercase font-bold text-gray-400 block mb-2 tracking-wider flex items-center gap-1">
+                      <Table2 size={11} className="text-purple-600" />
+                      Вставить рукописную таблицу
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        onClick={() => insertTableTemplate('ruler')}
+                        className="bg-purple-50 hover:bg-purple-100 border border-purple-200 hover:border-purple-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-purple-700 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>📏 Нарисовать по линейке</span>
+                      </button>
+                      <button
+                        onClick={() => insertTableTemplate('handdrawn')}
+                        className="bg-orange-50 hover:bg-orange-100 border border-orange-200 hover:border-orange-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-orange-700 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>✍️ Слегка неровно от руки</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Margins & Sizing Adjusters */}
@@ -607,17 +1046,30 @@ export default function App() {
                     </div>
 
                     <div>
-                      <label className="text-[10px] sm:text-[11px] font-bold text-gray-400 block mb-1">ЦВЕТ ЧЕРНИЛ</label>
+                      <label className="text-[10px] sm:text-[11px] font-bold text-gray-400 block mb-1">ИНСТРУМЕНТ</label>
                       <select
-                        value={config.inkColor}
-                        onChange={(e) => setConfig({ ...config, inkColor: e.target.value as any })}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs font-bold"
+                        value={config.toolType || 'pen'}
+                        onChange={(e) => {
+                          const newTool = e.target.value as any;
+                          const meta = TOOL_META[newTool as keyof typeof TOOL_META] || TOOL_META.pen;
+                          let newColor = config.inkColor;
+                          if (!(meta.colors as readonly string[]).includes(newColor)) {
+                            newColor = meta.colors[0] as typeof config.inkColor;
+                          }
+                          setConfig({ 
+                            ...config, 
+                            toolType: newTool,
+                            inkColor: newColor,
+                            strokeThickness: meta.default
+                          });
+                        }}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs font-bold text-blue-600 border-blue-100"
                       >
-                        <option value="blue">Синий</option>
-                        <option value="black">Черный</option>
-                        <option value="red">Красный</option>
-                        <option value="purple">Фиолетовый</option>
-                        <option value="green">Зеленый</option>
+                        <option value="pen">🖋️ Ручка / Перо</option>
+                        <option value="felt">🖍️ Фломастер</option>
+                        <option value="pencil">✏️ Простой карандаш</option>
+                        <option value="colored-pencil">🎨 Цветной карандаш</option>
+                        <option value="marker">⚡ Текстовыделитель</option>
                       </select>
                     </div>
 
@@ -632,6 +1084,268 @@ export default function App() {
                         <option value="serif">С засечками</option>
                       </select>
                     </div>
+                  </div>
+
+                  {/* Ink/Graphite Color Palette */}
+                  {/* Office-Style Segmented Tab for Ink vs Text Outline */}
+                  <div className="pt-3.5 border-t border-gray-100 flex flex-col gap-2.5">
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-wider">Палитра цветов (Office-style)</label>
+                      <span className="text-xs font-bold text-gray-700 bg-gray-50 px-2.5 py-0.5 rounded border border-gray-100">
+                        {colorTab === 'ink'
+                          ? `Чернила: ${PALETTE_COLORS.find(c => c.id === config.inkColor)?.name || config.inkColor}`
+                          : `Окантовка: ${config.textOutlineColor || 'Без окантовки'}`}
+                      </span>
+                    </div>
+
+                    {/* Segmented Tab controls */}
+                    <div className="flex bg-gray-100 p-0.5 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setColorTab('ink')}
+                        className={`flex-1 py-1 px-2 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                          colorTab === 'ink'
+                            ? 'bg-white text-gray-850 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        🖋️ Цвет чернил
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setColorTab('outline')}
+                        className={`flex-1 py-1 px-2 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                          colorTab === 'outline'
+                            ? 'bg-white text-gray-850 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        ✨ Окантовка текста
+                      </button>
+                    </div>
+
+                    {/* Description for active tab constraints */}
+                    {colorTab === 'ink' && config.toolType === 'pencil' && (
+                      <div className="text-[10px] text-gray-500 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                        ✏️ Для графитового карандаша цвета ограничены шкалой серых оттенков.
+                      </div>
+                    )}
+
+                    {/* Office Grid Display */}
+                    <div className="flex flex-col gap-2.5 bg-gray-50/50 p-3 rounded-xl border border-gray-100">
+                      
+                      {/* Theme Colors Matrix (10 Columns, 6 Rows of Shades) */}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">Цвета темы</span>
+                        <div className="flex justify-between gap-[3px] bg-white p-2 rounded-lg border border-gray-100 shadow-inner overflow-x-auto">
+                          {OFFICE_THEME_COLUMNS.map((col, colIdx) => {
+                            return (
+                              <div key={colIdx} className="flex flex-col gap-[3px] flex-1 min-w-[14px] max-w-[28px]">
+                                {col.shades.map((shade, shadeIdx) => {
+                                  const isInkTab = colorTab === 'ink';
+                                  
+                                  // Graphite pencil only supports grays / black-whites
+                                  let isShadeAllowed = true;
+                                  if (isInkTab && config.toolType === 'pencil') {
+                                    isShadeAllowed = colIdx === 0 || colIdx === 1;
+                                  }
+
+                                  const isSelected = isInkTab
+                                    ? config.inkColor === shade
+                                    : config.textOutlineColor === shade;
+
+                                  return (
+                                    <button
+                                      key={shadeIdx}
+                                      type="button"
+                                      disabled={!isShadeAllowed}
+                                      onClick={() => {
+                                        if (isInkTab) {
+                                          setConfig({ ...config, inkColor: shade });
+                                        } else {
+                                          setConfig({ ...config, textOutlineColor: shade });
+                                        }
+                                      }}
+                                      className={`aspect-square w-full rounded-[1px] transition-all relative cursor-pointer border-[0.5px] border-black/5 hover:scale-115 active:scale-95 ${
+                                        isSelected ? 'ring-1 ring-offset-[0.5px] ring-blue-500 scale-105 z-10' : ''
+                                      } ${!isShadeAllowed ? 'opacity-10 cursor-not-allowed hover:scale-100' : ''}`}
+                                      style={{ backgroundColor: shade }}
+                                      title={`${col.name} (Оттенок ${shadeIdx + 1}): ${shade}`}
+                                    >
+                                      {isSelected && (
+                                        <span className="absolute inset-0 flex items-center justify-center">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-sm invert" />
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Standard Colors Row */}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9.5px] font-bold text-gray-400 uppercase tracking-wider block">Стандартные цвета</span>
+                        <div className="flex justify-between gap-[3.5px] bg-white p-2 rounded-lg border border-gray-100 shadow-inner">
+                          {OFFICE_STANDARD_COLORS.map((colorHex, idx) => {
+                            const isInkTab = colorTab === 'ink';
+                            let isColorAllowed = true;
+                            if (isInkTab && config.toolType === 'pencil') {
+                              isColorAllowed = false;
+                            }
+
+                            const isSelected = isInkTab
+                              ? config.inkColor === colorHex
+                              : config.textOutlineColor === colorHex;
+
+                            return (
+                              <button
+                                key={idx}
+                                type="button"
+                                disabled={!isColorAllowed}
+                                onClick={() => {
+                                  if (isInkTab) {
+                                    setConfig({ ...config, inkColor: colorHex });
+                                  } else {
+                                    setConfig({ ...config, textOutlineColor: colorHex });
+                                  }
+                                }}
+                                className={`aspect-square flex-1 min-w-[14px] max-w-[28px] rounded transition-all relative cursor-pointer border-[0.5px] border-black/5 hover:scale-[1.2] active:scale-90 ${
+                                  isSelected ? 'ring-1 ring-offset-[0.5px] ring-blue-500 scale-[1.1] z-10' : ''
+                                } ${!isColorAllowed ? 'opacity-10 cursor-not-allowed hover:scale-100' : ''}`}
+                                style={{ backgroundColor: colorHex }}
+                                title={`Стандартный цвет: ${colorHex}`}
+                              >
+                                {isSelected && (
+                                  <span className="absolute inset-0 flex items-center justify-center">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-sm invert" />
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Custom Spectrum Picker and direct HEX input */}
+                      <div className="flex items-center justify-between pt-2.5 border-t border-gray-100 gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-gray-500 whitespace-nowrap">Спектр:</span>
+                          <input
+                            type="color"
+                            value={customHexInput}
+                            onChange={(e) => {
+                               const value = e.target.value;
+                               if (colorTab === 'ink') {
+                                 setConfig({ ...config, inkColor: value });
+                               } else {
+                                 setConfig({ ...config, textOutlineColor: value });
+                               }
+                            }}
+                            className="w-7 h-7 rounded border border-gray-200 cursor-pointer p-0.5 bg-white shadow-sm flex-shrink-0"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-1 flex-1 min-w-0">
+                          <span className="text-[9.5px] font-mono font-bold text-gray-400">HEX:</span>
+                          <input
+                            type="text"
+                            value={customHexInput}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setCustomHexInput(val);
+                              if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                                if (colorTab === 'ink') {
+                                  setConfig({ ...config, inkColor: val });
+                                } else {
+                                  setConfig({ ...config, textOutlineColor: val });
+                                }
+                              }
+                            }}
+                            placeholder="#000000"
+                            className="w-full max-w-[70px] bg-white border border-gray-250 rounded px-1.5 py-0.5 text-[11px] font-mono font-bold text-gray-700 outline-none focus:border-blue-400"
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (colorTab === 'ink') {
+                              // Reset ink to standard blue
+                              setConfig({ ...config, inkColor: 'blue' });
+                            } else {
+                              // Reset/remove text outline color
+                              setConfig({ ...config, textOutlineColor: undefined });
+                            }
+                          }}
+                          className="px-2 py-1 text-[10px] font-bold text-gray-400 hover:text-red-500 hover:bg-red-50 border border-gray-150 rounded-lg transition-all flex items-center gap-0.5 flex-shrink-0 cursor-pointer"
+                        >
+                          <RotateCcw size={10} />
+                          <span>Сбросить</span>
+                        </button>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Dynamic Font Size Adjustment Slider + Quick Actions */}
+                  <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] sm:text-[11px] font-bold text-gray-400">РАЗМЕР ШРИФТА (ПОЧЕРКА)</label>
+                      <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{fontSize}px</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="16"
+                        max="36"
+                        step="1"
+                        value={fontSize}
+                        onChange={(e) => setFontSize(parseInt(e.target.value))}
+                        className="flex-1 h-1.5 bg-gray-100 rounded-lg appearance-none accent-blue-600 cursor-pointer"
+                      />
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => setFontSize(18)}
+                          className={`px-2 py-0.5 text-[10px] sm:text-[10.5px] font-bold rounded border cursor-pointer hover:bg-gray-50 transition-all ${fontSize <= 20 ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-200 text-gray-600'}`}
+                        >
+                          Мелкий
+                        </button>
+                        <button
+                          onClick={() => setFontSize(24)}
+                          className={`px-2 py-0.5 text-[10px] sm:text-[10.5px] font-bold rounded border cursor-pointer hover:bg-gray-50 transition-all ${fontSize > 20 && fontSize < 28 ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-200 text-gray-600'}`}
+                        >
+                          Средний
+                        </button>
+                        <button
+                          onClick={() => setFontSize(30)}
+                          className={`px-2 py-0.5 text-[10px] sm:text-[10.5px] font-bold rounded border cursor-pointer hover:bg-gray-50 transition-all ${fontSize >= 28 ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-200 text-gray-600'}`}
+                        >
+                          Крупный
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Smart advisor box for felt-tip and marker pens */}
+                    {(config.inkColor === 'marker-yellow' || config.inkColor === 'felt-pink' || config.inkColor === 'felt-blue') && fontSize < 26 && (
+                      <div className="mt-1 text-[11px] leading-relaxed text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex flex-col gap-1.5 animate-fadeIn">
+                        <span className="font-bold flex items-center gap-1">
+                          ⚠️ Слишком толстый инструмент!
+                        </span>
+                        <span>
+                          Из-за толщины фломастера или маркера буквы могут сливаться в сплошные пятна при малом размере шрифта ({fontSize}px). Советуем увеличить размер почерка.
+                        </span>
+                        <button
+                          onClick={() => setFontSize(28)}
+                          className="self-start text-[10px] font-bold bg-amber-100 px-2.5 py-1 rounded cursor-pointer hover:bg-amber-200 text-amber-800 transition-colors flex items-center gap-1"
+                        >
+                          🪄 Сделать шрифт крупным (28px)
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -763,18 +1477,21 @@ export default function App() {
 
                     <div>
                       <div className="flex justify-between items-center text-[11px] font-semibold text-gray-400 mb-1">
-                        <span>ТОЛЩИНА ПЕРА (ЛИНИИ)</span>
-                        <span className="text-gray-700">{config.strokeThickness}px</span>
+                        <span>{getToolThicknessMeta(config.inkColor, config.toolType)?.label || 'ТОЛЩИНА ПЕРА (ЛИНИИ)'}</span>
+                        <span className="text-gray-700 font-bold">{config.strokeThickness.toFixed(1)}px</span>
                       </div>
                       <input
                         type="range"
-                        min="0.5"
-                        max="3.0"
-                        step="0.1"
+                        min={getToolThicknessMeta(config.inkColor, config.toolType)?.min || 0.5}
+                        max={getToolThicknessMeta(config.inkColor, config.toolType)?.max || 3.0}
+                        step={getToolThicknessMeta(config.inkColor, config.toolType)?.step || 0.1}
                         value={config.strokeThickness}
                         onChange={(e) => setConfig({ ...config, strokeThickness: parseFloat(e.target.value) })}
                         className="w-full h-1 bg-gray-100 rounded-lg appearance-none accent-blue-600 cursor-pointer"
                       />
+                      <span className="text-[9.5px] mt-1 text-gray-400 block font-normal">
+                        {getToolThicknessMeta(config.inkColor, config.toolType)?.desc}
+                      </span>
                     </div>
 
                     <div>
@@ -795,30 +1512,134 @@ export default function App() {
                   </div>
 
                   {/* Signature builder */}
-                  <div className="border-t border-gray-100 pt-3.5 mt-1">
-                    <span className="text-[11px] font-bold text-gray-400 block mb-2 tracking-wider flex items-center gap-1">
-                      <Fingerprint size={12} className="text-blue-500" />
-                      Генератор чернильной подписи
-                    </span>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={signatureName}
-                        onChange={(e) => setSignatureName(e.target.value)}
-                        placeholder="Имя подписи"
-                        className="flex-1 bg-gray-50 border border-gray-200 outline-none rounded-lg p-2 text-xs font-semibold"
-                      />
+                  <div className="border-t border-gray-100 pt-3.5 mt-1 animate-fadeIn">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[11px] font-bold text-gray-400 tracking-wider flex items-center gap-1">
+                        <Fingerprint size={12} className="text-blue-500" />
+                        БИБЛИОТЕКА ПОДПИСЕЙ
+                      </span>
                       <button
                         onClick={() => setShowSignature(!showSignature)}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border cursor-pointer hover:bg-gray-50 transition-all ${
                           showSignature 
-                            ? 'bg-blue-50 border-blue-200 text-blue-600' 
-                            : 'bg-white border-gray-200 text-gray-600'
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-600' 
+                            : 'bg-white border-gray-200 text-gray-400'
                         }`}
                       >
-                        {showSignature ? 'Выключить' : 'Включить'}
+                        {showSignature ? '● Подпись включена' : '○ Выключена'}
                       </button>
                     </div>
+
+                    {showSignature && (
+                      <div className="flex flex-col gap-2">
+                        {/* Selector of signatures */}
+                        <div className="flex flex-col gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                          {currentSignatures.map((sig) => {
+                            const isSelected = sig.id === activeSigId;
+                            return (
+                              <div 
+                                key={sig.id}
+                                className={`flex items-center justify-between p-2 rounded-lg border transition-all text-xs ${
+                                  isSelected 
+                                    ? 'bg-blue-50/70 border-blue-200 text-blue-900 font-semibold' 
+                                    : 'bg-gray-50/40 border-gray-100 text-gray-600 hover:bg-gray-50'
+                                }`}
+                              >
+                                <div 
+                                  className="flex-1 cursor-pointer flex items-center gap-2"
+                                  onClick={() => {
+                                    setSelectedSignatureIds(prev => ({
+                                      ...prev,
+                                      [activeStyle.id]: sig.id
+                                    }));
+                                  }}
+                                >
+                                  <input 
+                                    type="radio" 
+                                    checked={isSelected}
+                                    readOnly
+                                    className="accent-blue-600"
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-gray-800">{sig.name}</span>
+                                    <span className="text-[10px] text-gray-400 font-mono">Подпись на бумаге: "{sig.signature}"</span>
+                                  </div>
+                                </div>
+
+                                {/* Delete button if not default */}
+                                {!sig.id.includes('-def-') && sig.id !== 's1' && sig.id !== 's2' && (
+                                  <button
+                                    onClick={() => {
+                                      const updatedList = currentSignatures.filter(s => s.id !== sig.id);
+                                      setFontSignatures(prev => ({
+                                        ...prev,
+                                        [activeStyle.id]: updatedList
+                                      }));
+                                      if (isSelected && updatedList.length > 0) {
+                                        setSelectedSignatureIds(prev => ({
+                                          ...prev,
+                                          [activeStyle.id]: updatedList[0].id
+                                        }));
+                                      }
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-gray-100 transition-colors cursor-pointer"
+                                    title="Удалить подпись"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Add Signature Form */}
+                        <div className="bg-gray-50/50 p-2.5 rounded-xl border border-gray-100 flex flex-col gap-2 mt-1">
+                          <span className="text-[10px] font-bold text-gray-400 block">СОЗДАТЬ ПОДПИСЬ ДЛЯ ЭТОГО ШРИФТА</span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={newSigName}
+                              onChange={(e) => setNewSigName(e.target.value)}
+                              placeholder="ФИО владельца"
+                              className="bg-white border border-gray-200 outline-none rounded-lg p-2 text-[11px] font-medium"
+                            />
+                            <input
+                              type="text"
+                              value={newSigText}
+                              onChange={(e) => setNewSigText(e.target.value)}
+                              placeholder="Текст подписи"
+                              className="bg-white border border-gray-200 outline-none rounded-lg p-2 text-[11px] font-medium"
+                            />
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (!newSigName.trim() || !newSigText.trim()) return;
+                              const newSigItem: SignatureItem = {
+                                id: `user-sig-${Date.now()}`,
+                                name: newSigName.trim(),
+                                signature: newSigText.trim()
+                              };
+                              const updatedList = [...currentSignatures, newSigItem];
+                              
+                              setFontSignatures(prev => ({
+                                ...prev,
+                                [activeStyle.id]: updatedList
+                              }));
+                              setSelectedSignatureIds(prev => ({
+                                ...prev,
+                                [activeStyle.id]: newSigItem.id
+                              }));
+                              setNewSigName('');
+                              setNewSigText('');
+                            }}
+                            className="w-full bg-blue-600 text-white rounded-lg p-1.5 text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-sm"
+                          >
+                            <Plus size={12} /> Добавить подпись
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -900,6 +1721,41 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
+
+      {/* Font Details Info Modal Dynamic Overlay */}
+      {fontsInfoModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[9999] px-4 animate-fade-in" id="fonts-info-modal">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 transform scale-100 transition-transform flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-3 text-purple-600 mb-4">
+                <span className="text-3xl">ℹ️</span>
+                <h3 className="text-lg font-black text-slate-800 leading-tight">Подробнее о системных шрифтах</h3>
+              </div>
+              
+              <div className="text-xs text-slate-600 space-y-3 mb-6 leading-relaxed font-sans">
+                <p className="font-bold">
+                  Система поддерживает три основных типа почерка:
+                </p>
+                <ul className="list-disc pl-4 space-y-1.5 font-semibold text-slate-600">
+                  <li><strong className="text-purple-600">Каллиграфические (#03)</strong> — идеальный плавный курсив с выраженными связями и наклоном.</li>
+                  <li><strong className="text-purple-600">Школьные аккуратные (#02 + KZ)</strong> — повседневный округлый вид конспектов для быстрой конвертации писем.</li>
+                  <li><strong className="text-purple-600">Свободные полупечатные (#05)</strong> — разборчивый студенческий лекционный стиль.</li>
+                </ul>
+                <p className="font-semibold text-slate-500">
+                  Все встроенные шрифты имеют встроенную поддержку мультиязычных символов, знаков препинания, формул LaTeX и специальных локализованных литер стран СНГ.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setFontsInfoModal(false)}
+              className="w-full flex items-center justify-center bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs py-3 px-4 rounded-xl transition-all shadow-md cursor-pointer"
+            >
+              Понятно
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

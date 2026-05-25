@@ -65,6 +65,8 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
   const [customLanguages, setCustomLanguages] = useState<Record<string, boolean>>({
     cyrillic: true,
     latin: false,
+    kazakh: false,
+    european: false,
     numbers: false,
     math: false,
     ligatures: false,
@@ -72,6 +74,23 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
   const [customExtraSymbols, setCustomExtraSymbols] = useState<string>('');
   const [selectedFontGridFilter, setSelectedFontGridFilter] = useState<string>('all');
   const [printWithLetter, setPrintWithLetter] = useState<boolean>(true);
+  const [printErrorModal, setPrintErrorModal] = useState<boolean>(false);
+
+  // Selected symbols for bulk custom print
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('typescribe_selected_symbols');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('typescribe_selected_symbols', JSON.stringify(selectedSymbols));
+    } catch {}
+  }, [selectedSymbols]);
 
   // Calibration and details workspace popup state (Screenshots 3 & 4)
   const [calibratingChar, setCalibratingChar] = useState<string | null>(null);
@@ -100,7 +119,9 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
     'А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я',
     'а', 'б', 'в', 'г', 'д', 'е', 'ё', 'ж', 'з', 'и', 'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 'ъ', 'ы', 'ь', 'э', 'ю', 'я',
-    'І', 'Ї', 'Є', 'Ґ', 'і', 'ї', 'є', 'ґ',
+    'І', 'Ї', 'Є', 'Ґ', 'і', 'ї', 'є', 'ґ', 'Ў', 'ў',
+    'Ә', 'Ң', 'Ғ', 'Ү', 'Ұ', 'Қ', 'Ө', 'Һ', 'ә', 'ң', 'ғ', 'ү', 'ұ', 'қ', 'ө', 'һ',
+    'ä', 'ö', 'ü', 'ß', 'é', 'è', 'à', 'ç', 'ñ', 'á', 'í', 'ó', 'ú', 'Ä', 'Ö', 'Ü', 'É', 'È', 'À', 'Ç', 'Ñ', 'Á', 'Í', 'Ó', 'Ú',
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
     '+', '-', '=', '/', '*', '(', ')', '[', ']', '{', '}', '<', '>', ',', '.', '?', '!', ':', ';', '\'', '"', '%', '&', '_', '#', '@', '$',
     '\\alpha', '\\beta', '\\gamma', '\\delta', '\\Delta', '\\theta', '\\lambda', '\\mu', '\\rho', '\\sigma', '\\phi', '\\psi', '\\omega', '\\Omega',
@@ -155,19 +176,32 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
   const [interpolationWeight, setInterpolationWeight] = useState<number>(0.5);
 
   const getFilteredCharList = (group: string) => {
+    if (group === 'selected_only') {
+      return selectedSymbols;
+    }
     if (group === 'custom_builder') {
       let result: string[] = [];
       if (customLanguages.cyrillic) {
         result = [...result, ...charList.filter(c => 
           (c >= 'А' && c <= 'Я') || 
           (c >= 'а' && c <= 'я') || 
-          ['ё', 'І', 'Ї', 'Є', 'Ґ', 'і', 'ї', 'є', 'ґ'].includes(c)
+          ['ё', 'І', 'Ї', 'Є', 'Ґ', 'і', 'ї', 'є', 'ґ', 'Ў', 'ў'].includes(c)
         )];
       }
       if (customLanguages.latin) {
         result = [...result, ...charList.filter(c => 
           (c >= 'a' && c <= 'z') || 
           (c >= 'A' && c <= 'Z')
+        )];
+      }
+      if (customLanguages.kazakh) {
+        result = [...result, ...charList.filter(c => 
+          ['Ә', 'Ң', 'Ғ', 'Ү', 'Ұ', 'Қ', 'Ө', 'Һ', 'ә', 'ң', 'ғ', 'ү', 'ұ', 'қ', 'ө', 'һ'].includes(c)
+        )];
+      }
+      if (customLanguages.european) {
+        result = [...result, ...charList.filter(c => 
+          ['ä', 'ö', 'ü', 'ß', 'é', 'è', 'à', 'ç', 'ñ', 'á', 'í', 'ó', 'ú', 'Ä', 'Ö', 'Ü', 'É', 'È', 'À', 'Ç', 'Ñ', 'Á', 'Í', 'Ó', 'Ú'].includes(c)
         )];
       }
       if (customLanguages.numbers) {
@@ -180,7 +214,18 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
         )];
       }
       if (customLanguages.ligatures) {
-        result = [...result, ...['ff', 'fi', 'fl', 'ft', 'th', 'te', 'st', 'ch', 'ck', 'sh', 'sch', 'er', 'en', 'on', 'an', 'and', 'ing', 'ion', 'ment', 'of', 'to', 'in', 'is', 'it', 'yo', 're', 'ee', 'oo', 'll', 'tt']];
+        result = [...result, ...[
+          'ff', 'fi', 'fl', 'ft', 'th', 'te', 'st', 'ch', 'ck', 'sh', 'sch', 'er', 'en', 'on', 'an', 'and', 'ing', 'ion', 'ment', 'of', 'to', 'in', 'is', 'it', 'yo', 're', 'ee', 'oo', 'll', 'tt',
+          'ст', 'по', 'он', 'ен', 'то', 'на', 'ли', 'ко', 'ра', 'ла', 'но', 'ре', 'ть', 'ом', 'пр', 'ве', 'ни', 'го', 'те', 'ки',
+          'ши', 'иш', 'ии', 'шш', 'ші', 'іш', 'іі', 'ил', 'ль', 'ми', 'им', 'мм', 'шл', 'лш', 'мл', 'лм', 'ци', 'иц', 'щи', 'ищ',
+          'ов', 'ош', 'во', 'вн', 'ви', 'вл', 'бо', 'би', 'бл',
+          'ти', 'ит', 'тт', 'пи', 'ип', 'пп', 'тп', 'пт', 'ди', 'ид',
+          'їй', 'її', 'ії', 'вм', 'ьє', 'іє',
+          'оо', 'оа', 'ао', 'сс', 'ее', 'ос', 'ас', 'ес', 'ох', 'ах', 'дв', 'дб',
+          'зу', 'уз', 'дз', 'дж', 'цу', 'щу',
+          'ка', 'ке', 'жж', 'фл', 'фи',
+          'ья', 'ью', 'ье', 'ьо', 'ые', 'ыи'
+        ]];
       }
       if (customExtraSymbols.trim()) {
         const uniqueExtras = Array.from(new Set(customExtraSymbols.replace(/[\s,]+/g, '').split(''))) as string[];
@@ -198,12 +243,20 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
         return charList.filter(c => 
           (c >= 'А' && c <= 'Я') || 
           (c >= 'а' && c <= 'я') || 
-          ['ё', 'І', 'Ї', 'Є', 'Ґ', 'і', 'ї', 'є', 'ґ'].includes(c)
+          ['ё', 'І', 'Ї', 'Є', 'Ґ', 'і', 'ї', 'є', 'ґ', 'Ў', 'ў'].includes(c)
         );
       case 'latin':
         return charList.filter(c => 
           (c >= 'a' && c <= 'z') || 
           (c >= 'A' && c <= 'Z')
+        );
+      case 'kazakh':
+        return charList.filter(c => 
+          ['Ә', 'Ң', 'Ғ', 'Ү', 'Ұ', 'Қ', 'Ө', 'Һ', 'ә', 'ң', 'ғ', 'ү', 'ұ', 'қ', 'ө', 'һ'].includes(c)
+        );
+      case 'european':
+        return charList.filter(c => 
+          ['ä', 'ö', 'ü', 'ß', 'é', 'è', 'à', 'ç', 'ñ', 'á', 'í', 'ó', 'ú', 'Ä', 'Ö', 'Ü', 'É', 'È', 'À', 'Ç', 'Ñ', 'Á', 'Í', 'Ó', 'Ú'].includes(c)
         );
       case 'numbers':
         return charList.filter(c => c >= '0' && c <= '9');
@@ -213,7 +266,18 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
           c.startsWith('\\')
         );
       case 'ligatures':
-        return ['ff', 'fi', 'fl', 'ft', 'th', 'te', 'st', 'ch', 'ck', 'sh', 'sch', 'er', 'en', 'on', 'an', 'and', 'ing', 'ion', 'ment', 'of', 'to', 'in', 'is', 'it', 'yo', 're', 'ee', 'oo', 'll', 'tt'];
+        return [
+          'ff', 'fi', 'fl', 'ft', 'th', 'te', 'st', 'ch', 'ck', 'sh', 'sch', 'er', 'en', 'on', 'an', 'and', 'ing', 'ion', 'ment', 'of', 'to', 'in', 'is', 'it', 'yo', 're', 'ee', 'oo', 'll', 'tt',
+          'ст', 'по', 'он', 'ен', 'то', 'на', 'ли', 'ко', 'ра', 'ла', 'но', 'ре', 'ть', 'ом', 'пр', 'ве', 'ни', 'го', 'те', 'ки',
+          'ши', 'иш', 'ии', 'шш', 'ші', 'іш', 'іі', 'ил', 'ль', 'ми', 'им', 'мм', 'шл', 'лш', 'мл', 'лм', 'ци', 'иц', 'щи', 'ищ',
+          'ов', 'ош', 'во', 'вн', 'ви', 'вл', 'бо', 'би', 'бл',
+          'ти', 'ит', 'тт', 'пи', 'ип', 'пп', 'тп', 'пт', 'ди', 'ид',
+          'їй', 'її', 'ії', 'вм', 'ьє', 'іє',
+          'оо', 'оа', 'ао', 'сс', 'ее', 'ос', 'ас', 'ес', 'ох', 'ах', 'дв', 'дб',
+          'зу', 'уз', 'дз', 'дж', 'цу', 'щу',
+          'ка', 'ке', 'жж', 'фл', 'фи',
+          'ья', 'ью', 'ье', 'ьо', 'ые', 'ыи'
+        ];
       default:
         return charList;
     }
@@ -221,9 +285,12 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
 
   const getGroupTitleStr = (group: string) => {
     switch(group) {
+      case 'selected_only': return '⭐ Выбранные символы для печати';
       case 'custom_builder': return 'Свой индивидуальный бланк';
-      case 'cyrillic': return 'Кириллица (Русский и Украинский)';
+      case 'cyrillic': return 'Кириллица (Русский, Украинский, Белорусский)';
       case 'latin': return 'Латиница (English Basics)';
+      case 'kazakh': return 'Казахский язык (Қазақ тілі)';
+      case 'european': return 'Европейская латиница (Диакритика - ä, ö, é, ç)';
       case 'numbers': return 'Цифровые символы (0-9)';
       case 'math': return 'Инженерные символы и формулы (Physics & Math)';
       case 'ligatures': return 'Популярные буквенные комбинации (Частые связки)';
@@ -477,17 +544,17 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
   // Download template forms
   const generateTemplateSVGString = (group: string, pageIndex: number): string => {
     const list = getFilteredCharList(group);
-    const charsPerPage = 16; 
+    const charsPerPage = 64; 
     const totalPages = Math.ceil(list.length / charsPerPage);
     const startIdx = pageIndex * charsPerPage;
     const sliced = list.slice(startIdx, startIdx + charsPerPage);
 
-    const cellW = 125;
-    const cellH = 170;
-    const gapX = 4;
-    const gapY = 4;
-    const startX = 40;
-    const startY = 60;
+    const cellW = 66;
+    const cellH = 92;
+    const gapX = 2;
+    const gapY = 2;
+    const startX = 26;
+    const startY = 50;
 
     const displayCharMap: Record<string, string> = {
       '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\Delta': 'Δ',
@@ -524,10 +591,10 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
     svgStr += drawMarker(20, 802);     // Bottom-Left
     svgStr += drawMarker(555, 802);    // Bottom-Right
 
-    // Loop through the 16 virtual grid cells
+    // Loop through the 64 virtual grid cells
     let charIdx = 0;
-    for (let r = 0; r < 4; r++) {
-      for (let c = 0; c < 4; c++) {
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
         const cellX = startX + c * (cellW + gapX);
         const cellY = startY + r * (cellH + gapY);
 
@@ -537,42 +604,42 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
         // Outer block
         svgStr += `<rect x="${cellX}" y="${cellY}" width="${cellW}" height="${cellH}" fill="#ffffff" stroke="#2e3846" stroke-width="0.8"/>`;
 
-        // Header division line (at cellY + 20)
-        svgStr += `<line x1="${cellX}" y1="${cellY + 20}" x2="${cellX + cellW}" y2="${cellY + 20}" stroke="#2e3846" stroke-width="0.8"/>`;
+        // Header division line (at cellY + 12)
+        svgStr += `<line x1="${cellX}" y1="${cellY + 12}" x2="${cellX + cellW}" y2="${cellY + 12}" stroke="#2e3846" stroke-width="0.8"/>`;
 
         if (char) {
           // Write character label in header division
           const displayChar = displayCharMap[char] || char;
           const cleanDisplayChar = displayChar.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          svgStr += `<text x="${cellX + 6}" y="${cellY + 14}" font-family="-apple-system, BlinkMacSystemFont, &apos;Segoe UI&apos;, Roboto, sans-serif" font-size="11" font-weight="bold" fill="#000000">${cleanDisplayChar}</text>`;
+          svgStr += `<text x="${cellX + 4}" y="${cellY + 9.5}" font-family="-apple-system, BlinkMacSystemFont, &apos;Segoe UI&apos;, Roboto, sans-serif" font-size="8.5" font-weight="bold" fill="#000000">${cleanDisplayChar}</text>`;
 
           // Guidelines divisions exactly matching specified heights:
           // ↑ 63% X-HEIGHT (основная строчная зона) -> 37% from top of drawing zone
           // ──────────────── BASELINE ≈ 33% -> 67% from top of drawing zone [Solid]
-          const zoneH = cellH - 20;
+          const zoneH = cellH - 12;
           const guidelines = [
             { id: 'xheight', yPct: 37, stroke: '#cbd5e1', width: 0.5, dash: '1.5,1.5' },
             { id: 'baseline', yPct: 67, stroke: '#3b82f6', width: 1.0, dash: '' }
           ];
 
           guidelines.forEach(g => {
-            const ly = cellY + 20 + (g.yPct / 100) * zoneH;
+            const ly = cellY + 12 + (g.yPct / 100) * zoneH;
             svgStr += `<line x1="${cellX}" y1="${ly}" x2="${cellX + cellW}" y2="${ly}" stroke="${g.stroke}" stroke-width="${g.width}" ${g.dash ? `stroke-dasharray="${g.dash}"` : ''}/>`;
           });
 
           // If background template letter is enabled, render it in beautiful handwriting font aligned exactly to baseline
           if (printWithLetter) {
-            svgStr += `<text x="${cellX + cellW / 2}" y="${cellY + 20 + 0.67 * zoneH}" font-family="&apos;Marck Script&apos;, &apos;Caveat&apos;, &apos;Neucha&apos;, &apos;Bad Script&apos;, cursive, sans-serif" font-size="75" fill="#6b21a8" fill-opacity="0.10" text-anchor="middle">${cleanDisplayChar}</text>`;
+            svgStr += `<text x="${cellX + cellW / 2}" y="${cellY + 12 + 0.67 * zoneH}" font-family="&apos;Marck Script&apos;, &apos;Caveat&apos;, &apos;Neucha&apos;, &apos;Bad Script&apos;, cursive, sans-serif" font-size="40" fill="#6b21a8" fill-opacity="0.10" text-anchor="middle">${cleanDisplayChar}</text>`;
           }
         } else {
           // Empty grid placeholders (showing lines)
-          const zoneH = cellH - 20;
+          const zoneH = cellH - 12;
           const guidelines = [
             { yPct: 37, stroke: '#cbd5e1', width: 0.5, dash: '1.5,1.5' },
             { yPct: 67, stroke: '#3b82f6', width: 1.0, dash: '' }
           ];
           guidelines.forEach(g => {
-            const ly = cellY + 20 + (g.yPct / 100) * zoneH;
+            const ly = cellY + 12 + (g.yPct / 100) * zoneH;
             svgStr += `<line x1="${cellX}" y1="${ly}" x2="${cellX + cellW}" y2="${ly}" stroke="${g.stroke}" stroke-width="${g.width}" ${g.dash ? `stroke-dasharray="${g.dash}"` : ''}/>`;
           });
         }
@@ -633,88 +700,114 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
     img.src = url;
   };
 
-  const handlePrintTemplate = () => {
-    const svgStr = generateTemplateSVGString(selectedTemplateGroup, templatePageIndex);
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert("Пожалуйста, разрешите всплывающие окна в настройках браузера!");
-      return;
+  const handlePrintTemplate = (allPages: boolean = false) => {
+    const list = getFilteredCharList(selectedTemplateGroup);
+    const totalPages = Math.ceil(list.length / 64) || 1;
+    
+    let pagesHtml = '';
+    
+    if (allPages) {
+      for (let pIdx = 0; pIdx < totalPages; pIdx++) {
+        const svgStr = generateTemplateSVGString(selectedTemplateGroup, pIdx);
+        pagesHtml += `<div class="print-page">${svgStr}</div>`;
+      }
+    } else {
+      const svgStr = generateTemplateSVGString(selectedTemplateGroup, templatePageIndex);
+      pagesHtml += `<div class="print-page">${svgStr}</div>`;
     }
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title></title>
-          <link rel="preconnect" href="https://fonts.googleapis.com">
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-          <link href="https://fonts.googleapis.com/css2?family=Bad+Script&family=Caveat&family=Marck+Script&family=Neucha&display=swap" rel="stylesheet">
-          <style>
-            @page {
-              size: A4 portrait;
-              margin: 0 !important;
-            }
-            html, body {
-              margin: 0 !important;
-              padding: 0 !important;
-              height: 100% !important;
-              width: 100% !important;
-              overflow: hidden !important;
-              background-color: #ffffff !important;
-            }
-            body { 
-              display: flex !important; 
-              justify-content: center !important; 
-              align-items: center !important; 
-            }
-            svg { 
-              width: 210mm !important; 
-              height: 297mm !important; 
-              display: block !important;
-              margin: 0 auto !important;
-              padding: 0 !important;
-            }
-            @media print {
-              html, body {
-                display: block !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 210mm !important;
-                height: 297mm !important;
-                overflow: hidden !important;
-                background-color: #ffffff !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-              }
-              svg {
-                width: 210mm !important;
-                height: 297mm !important;
-                max-width: 100% !important;
-                max-height: 100% !important;
-                display: block !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                right: 0 !important;
-                page-break-inside: avoid !important;
-                page-break-after: avoid !important;
-                page-break-before: avoid !important;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          ${svgStr}
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+
+    // Create a temporary container on document.body for direct printing
+    const printContainer = document.createElement('div');
+    printContainer.id = 'typescribe-print-inject-container';
+    printContainer.innerHTML = pagesHtml;
+    document.body.appendChild(printContainer);
+
+    // Apply print-specific style block to hide everything else
+    const styleElement = document.createElement('style');
+    styleElement.id = 'typescribe-print-inject-styles';
+    styleElement.textContent = `
+      @media print {
+        body > *:not(#typescribe-print-inject-container) {
+          display: none !important;
+        }
+        #typescribe-print-inject-container {
+          display: block !important;
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 210mm !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background-color: #ffffff !important;
+          overflow: visible !important;
+        }
+        @page {
+          size: A4 portrait;
+          margin: 0px !important;
+        }
+        .print-page {
+          width: 210mm !important;
+          height: 297mm !important;
+          position: relative !important;
+          page-break-inside: avoid !important;
+          page-break-before: auto !important;
+          page-break-after: always !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+          background-color: #ffffff !important;
+          display: block !important;
+          box-sizing: border-box !important;
+        }
+        .print-page:last-child {
+          page-break-after: avoid !important;
+        }
+        svg {
+          width: 210mm !important;
+          height: 297mm !important;
+          max-width: 100% !important;
+          max-height: 100% !important;
+          display: block !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+      }
+    `;
+    document.head.appendChild(styleElement);
+
+    // Trigger print directly
+    try {
+      window.focus();
+      
+      // Proactively check if the application is nested inside an iframe
+      if (window.self !== window.top) {
+        throw new Error("Embedded sandbox mode restricts direct window.print()");
+      }
+
+      window.print();
+
+      // Clean up container and styles after print starts
+      setTimeout(() => {
+        if (document.body.contains(printContainer)) {
+          document.body.removeChild(printContainer);
+        }
+        if (document.head.contains(styleElement)) {
+          document.head.removeChild(styleElement);
+        }
+      }, 1000);
+    } catch (err) {
+      console.warn("Direct template print blocked or restricted in iframe:", err);
+      // Clean up injected elements immediately
+      if (document.body.contains(printContainer)) {
+        document.body.removeChild(printContainer);
+      }
+      if (document.head.contains(styleElement)) {
+        document.head.removeChild(styleElement);
+      }
+      // Open the custom fallback instruction modal
+      setPrintErrorModal(true);
+    }
   };
 
   // Triggering scanner simulation mimicking screenshot 2 (Upload Template workflow)
@@ -1067,11 +1160,14 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
               
               <div className="flex flex-col gap-1.5">
                 {[
-                  { id: 'cyrillic', label: 'Кириллица (RU / UA)', count: 66 },
-                  { id: 'latin', label: 'Латиница (English)', count: 52 },
-                  { id: 'numbers', label: 'Цифры (0-9)', count: 10 },
-                  { id: 'math', label: 'Математика и Греческие', count: 64 },
-                  { id: 'ligatures', label: 'Лигатуры и связки', count: 30 },
+                  { id: 'cyrillic', label: 'Кириллица (RU / UA / BY)', count: getFilteredCharList('cyrillic').length },
+                  { id: 'latin', label: 'Латиница (English)', count: getFilteredCharList('latin').length },
+                  { id: 'kazakh', label: 'Қазақша (Казахский)', count: getFilteredCharList('kazakh').length },
+                  { id: 'european', label: 'European (Диакритика)', count: getFilteredCharList('european').length },
+                  { id: 'numbers', label: 'Цифры (0-9)', count: getFilteredCharList('numbers').length },
+                  { id: 'math', label: 'Математика и символы', count: getFilteredCharList('math').length },
+                  { id: 'ligatures', label: 'Лигатуры и связки', count: getFilteredCharList('ligatures').length },
+                  { id: 'selected_only', label: '⭐ Выбранные символы', count: selectedSymbols.length },
                   { id: 'custom_builder', label: '🎨 Конструктор бланка', count: getFilteredCharList('custom_builder').length },
                   { id: 'all', label: 'Все доступные символы', count: charList.length }
                 ].map(cat => (
@@ -1121,11 +1217,13 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                   {/* Checkboxes grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {[
-                      { key: 'cyrillic', label: 'Кириллица (RU/UA)' },
+                      { key: 'cyrillic', label: 'Кириллица (RU/UA/BY)' },
                       { key: 'latin', label: 'Латиница (English)' },
+                      { key: 'kazakh', label: 'Казахский (KZ)' },
+                      { key: 'european', label: 'Диакритика (DE/FR/ES)' },
                       { key: 'numbers', label: 'Цифры (0-9)' },
                       { key: 'math', label: 'Математика / Спец' },
-                      { key: 'ligatures', label: 'Связки букв (ff, fi...)' }
+                      { key: 'ligatures', label: 'Связки букв (ff, ст, по...)' }
                     ].map(lang => (
                       <label key={lang.key} className="flex items-center gap-2 px-3 py-2 border border-slate-100 rounded-xl hover:bg-purple-50/40 cursor-pointer select-none transition-all">
                         <input
@@ -1163,20 +1261,82 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                   {/* Summary of pages */}
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-purple-50/50 border border-purple-100/50 p-3 rounded-xl gap-2 mt-0.5">
                     <div className="text-[10px] font-bold text-purple-950">
-                      Итого выбранных символов: <span className="font-extrabold text-[#7c3aed]">{getFilteredCharList('custom_builder').length}</span> • Листов А4 потребуется: <span className="font-extrabold text-[#7c3aed]">{Math.ceil(getFilteredCharList('custom_builder').length / 16) || 1}</span>
+                      Итого выбранных символов: <span className="font-extrabold text-[#7c3aed]">{getFilteredCharList('custom_builder').length}</span> • Листов А4 потребуется: <span className="font-extrabold text-[#7c3aed]">{Math.ceil(getFilteredCharList('custom_builder').length / 64) || 1}</span>
                     </div>
                     <span className="text-[9px] text-[#7c3aed] font-extrabold bg-white border border-[#7c3aed]/10 px-2 py-0.5 rounded-md shadow-3xs">
-                      {16 - (getFilteredCharList('custom_builder').length % 16 || 16)} свободных ячеек
+                      {64 - (getFilteredCharList('custom_builder').length % 64 || 64)} свободных ячеек
                     </span>
                   </div>
                 </div>
               )}
 
+              {/* Selected symbols quick panel */}
+              {selectedSymbols.length > 0 && (
+                <div className="w-full max-w-[595px] bg-gradient-to-r from-purple-500 to-indigo-600 text-white p-4 rounded-2xl shadow-lg flex flex-col gap-2.5 animate-in slide-in-from-top duration-300">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">⭐</span>
+                      <div>
+                        <h4 className="text-xs font-extrabold uppercase tracking-wider">Выбрано символов для печати ({selectedSymbols.length})</h4>
+                        <span className="text-[10px] text-purple-100 font-bold block mt-0.5">Сформирован индивидуальный бланк. Будет распечатано по 64 штук на лист А4.</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                      <button
+                        onClick={() => {
+                          setSelectedTemplateGroup('selected_only');
+                          setTemplatePageIndex(0);
+                        }}
+                        className="px-3 py-1.5 text-[10px] uppercase font-black bg-white text-[#7c3aed] rounded-xl shadow-xs hover:bg-purple-50 transition-all cursor-pointer"
+                      >
+                        Показать список
+                      </button>
+                      <button
+                        onClick={() => setSelectedSymbols([])}
+                        className="px-3 py-1.5 text-[10px] uppercase font-black bg-purple-700/50 hover:bg-purple-700 text-white rounded-xl transition-all cursor-pointer"
+                      >
+                        Очистить все
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Inline list of characters with quick delete icons */}
+                  <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto bg-black/15 p-2 rounded-xl border border-white/5">
+                    {selectedSymbols.map(char => {
+                      const displayCharMap: Record<string, string> = {
+                        '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\Delta': 'Δ',
+                        '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ', '\\rho': 'ρ', '\\sigma': 'σ',
+                        '\\phi': 'φ', '\\psi': 'ψ', '\\omega': 'ω', '\\Omega': 'Ω',
+                        '\\degree': '°', '\\pm': '±', '\\times': '×', '\\div': '÷',
+                        '\\approx': '≈', '\\ne': '≠', '\\neq': '≠', '\\le': '≤', '\\ge': '≥',
+                        '\\partial': '∂', '\\nabla': '∇', '\\infty': '∞', '\\hbar': 'ħ',
+                        '\\int': '∫', '\\sum': '∑', '\\sqrt': '√', '\\pi': 'π'
+                      };
+                      const display = displayCharMap[char] || char;
+                      return (
+                        <div key={char} className="flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white px-2 py-0.5 rounded-lg text-xs font-bold font-mono transition-all">
+                          <span>{display}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedSymbols(prev => prev.filter(s => s !== char));
+                            }}
+                            className="bg-black/15 hover:bg-black/45 text-white leading-none rounded-full w-4 h-4 flex items-center justify-center text-[9px] cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Toolbar in sheet page view */}
-              <div className="w-full max-w-[595px] bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
+              <div className="w-full max-w-[595px] bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-3">
                 
                 {/* Pagination */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => setTemplatePageIndex(p => Math.max(0, p - 1))}
                     disabled={templatePageIndex === 0}
@@ -1185,11 +1345,11 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                     <ChevronLeft size={14} className="text-slate-600" />
                   </button>
                   <span className="text-xs font-bold text-slate-700 font-mono">
-                    Страница {templatePageIndex + 1} из {Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 16) || 1}
+                    Страница {templatePageIndex + 1} из {Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) || 1}
                   </span>
                   <button
-                    onClick={() => setTemplatePageIndex(p => Math.min(Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 16) - 1, p + 1))}
-                    disabled={templatePageIndex >= Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 16) - 1}
+                    onClick={() => setTemplatePageIndex(p => Math.min(Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) - 1, p + 1))}
+                    disabled={templatePageIndex >= Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) - 1}
                     className="p-1.5 border border-slate-200 rounded-lg bg-white shadow-xs hover:bg-slate-50 transition-all disabled:opacity-40 hover:scale-105 active:scale-95 disabled:pointer-events-none"
                   >
                     <ChevronRight size={14} className="text-slate-600" />
@@ -1197,7 +1357,7 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                 </div>
 
                 {/* Actions mimicking calligraphr bar */}
-                <div className="flex items-center gap-1.5 animate-fade-in">
+                <div className="flex flex-wrap items-center justify-end gap-1.5 w-full animate-fade-in">
                   <label className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs font-bold text-slate-700 cursor-pointer hover:bg-slate-50 transition-all shadow-xs">
                     <input
                       type="checkbox"
@@ -1209,19 +1369,29 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                   </label>
 
                   <button
-                    onClick={handlePrintTemplate}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-[#7c3aed] text-white rounded-xl text-xs font-bold shadow-sm shadow-purple-600/10 hover:bg-purple-700 transition-all hover:scale-102 active:scale-98 cursor-pointer"
+                    onClick={() => handlePrintTemplate(false)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-purple-50 text-[#7c3aed] border border-purple-100 rounded-xl text-xs font-bold hover:bg-purple-100 transition-all cursor-pointer"
+                    title="Распечатать только текущую страницу бланка"
                   >
                     <Printer size={13} />
-                    <span>Распечатать А4</span>
+                    <span>Печать текущей</span>
+                  </button>
+
+                  <button
+                    onClick={() => handlePrintTemplate(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-[#7c3aed] text-white rounded-xl text-xs font-black shadow-sm shadow-purple-600/10 hover:bg-purple-700 transition-all cursor-pointer"
+                    title="Распечатать полностью все выбранные листы бланка"
+                  >
+                    <Printer size={13} />
+                    <span>Печать ВСЕХ ({Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) || 1} стр.)</span>
                   </button>
                   
                   <button
                     onClick={handleDownloadSVG}
-                    className="flex items-center gap-1 px-3 py-2 border border-[#7c3aed]/20 bg-purple-50 text-[#7c3aed] rounded-xl text-xs font-bold hover:bg-purple-100 transition-all cursor-pointer"
+                    className="flex items-center gap-1 px-3 py-2 border border-slate-200 bg-white text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer"
                     title="Векторный SVG"
                   >
-                    <Download size={13} />
+                    <Download size={13} className="text-purple-600" />
                     <span>SVG</span>
                   </button>
 
@@ -1230,7 +1400,7 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                     className="flex items-center gap-1 px-3 py-2 border border-slate-200 bg-white text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer"
                     title="Высококачественный PNG"
                   >
-                    <Download size={13} />
+                    <Download size={13} className="text-slate-500" />
                     <span>PNG</span>
                   </button>
                 </div>
@@ -1261,89 +1431,147 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                     </div>
                   </div>
 
-                  {/* Grid cells containing template guide path (4 columns x 4 rows) */}
-                  <div className="flex-1 grid grid-cols-4 grid-rows-4 gap-1 relative border border-slate-800">
-                    {(() => {
-                      const list = getFilteredCharList(selectedTemplateGroup);
-                      const sliced = list.slice(templatePageIndex * 16, (templatePageIndex + 1) * 16);
-                      
-                      const cells = [];
-                      let charIdx = 0;
-                      
-                      for (let r = 0; r < 4; r++) {
-                        for (let c = 0; c < 4; c++) {
-                          cells.push({ type: 'char', char: sliced[charIdx] || null, originalIdx: charIdx });
-                          charIdx++;
+                  {selectedTemplateGroup === 'selected_only' && getFilteredCharList('selected_only').length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 border border-slate-300 bg-slate-50/50 rounded-2xl w-full h-full min-h-[400px]">
+                      <div className="text-4xl mb-3">⭐</div>
+                      <h4 className="text-sm font-black text-slate-800 mb-1">Список пуст</h4>
+                      <p className="text-xs text-slate-500 max-w-[280px] leading-relaxed font-bold">
+                        У вас ещё нет выбранных символов для бланка. Выберите любую другую категорию слева (например, Кириллица или Цифры) и нажимайте на любые карточки, чтобы составить свой собственный бланк!
+                      </p>
+                    </div>
+                  ) : (
+                    <div 
+                      className="flex-1 grid grid-cols-8 grid-rows-8 gap-0.5 relative border border-slate-800 bg-white"
+                      style={{ gridTemplateColumns: 'repeat(8, minmax(0, 1fr))', gridTemplateRows: 'repeat(8, minmax(0, 1fr))' }}
+                    >
+                      {(() => {
+                        const list = getFilteredCharList(selectedTemplateGroup);
+                        const sliced = list.slice(templatePageIndex * 64, (templatePageIndex + 1) * 64);
+                        
+                        const cells = [];
+                        let charIdx = 0;
+                        
+                        for (let r = 0; r < 8; r++) {
+                          for (let c = 0; c < 8; c++) {
+                            cells.push({ type: 'char', char: sliced[charIdx] || null, originalIdx: charIdx });
+                            charIdx++;
+                          }
                         }
-                      }
 
-                      return cells.map((cell, index) => {
-                        const char = cell.char;
-                        if (!char) {
+                        return cells.map((cell, index) => {
+                          const char = cell.char;
+                          if (!char) {
+                            return (
+                              <div 
+                                key={index} 
+                                className="border border-slate-850 bg-[#fafafa]/50 relative flex flex-col justify-between p-1 overflow-hidden"
+                              >
+                                {/* Guidelines grid divisions mock with baseline ≈ 33% */}
+                                <div className="absolute inset-0 pointer-events-none opacity-[0.35] z-0">
+                                  <div className="absolute top-[12px] left-0 right-0 h-[0.5px] bg-slate-300"></div>
+                                  <div className="absolute top-[37%] left-0 right-0 h-[0.5px] bg-slate-300 border-dashed"></div>
+                                  <div className="absolute top-[67%] left-0 right-0 h-[1.2px] bg-blue-500/80"></div>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          const isSelectedChar = selectedSymbols.includes(char);
+                          const displayCharMap: Record<string, string> = {
+                            '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\Delta': 'Δ',
+                            '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ', '\\rho': 'ρ', '\\sigma': 'σ',
+                            '\\phi': 'φ', '\\psi': 'ψ', '\\omega': 'ω', '\\Omega': 'Ω',
+                            '\\degree': '°', '\\pm': '±', '\\times': '×', '\\div': '÷',
+                            '\\approx': '≈', '\\ne': '≠', '\\neq': '≠', '\\le': '≤', '\\ge': '≥',
+                            '\\partial': '∂', '\\nabla': '∇', '\\infty': '∞', '\\hbar': 'ħ',
+                            '\\int': '∫', '\\sum': '∑', '\\sqrt': '√', '\\pi': 'π'
+                          };
+                          const display = displayCharMap[char] || char;
+
                           return (
                             <div 
                               key={index} 
-                              className="border border-slate-800 bg-[#fafafa]/30 relative flex flex-col justify-between p-2 overflow-hidden"
+                              onClick={() => {
+                                setSelectedSymbols(prev => {
+                                  if (prev.includes(char)) {
+                                    return prev.filter(c => c !== char);
+                                  } else {
+                                    return [...prev, char];
+                                  }
+                                });
+                              }}
+                              className={`border border-slate-800 bg-white relative flex flex-col overflow-hidden cursor-pointer transition-all ${
+                                isSelectedChar 
+                                  ? 'ring-2 ring-purple-600 ring-offset-[1.5px] bg-purple-50/15 scale-[0.99] shadow-inner' 
+                                  : 'hover:border-purple-400 hover:shadow-xs'
+                              }`}
                             >
-                              {/* Guidelines grid divisions mock with baseline ≈ 33% */}
-                              <div className="absolute inset-0 pointer-events-none opacity-[0.35] z-0">
-                                <div className="absolute top-[37%] left-0 right-0 h-[0.5px] bg-slate-300 border-dashed"></div>
-                                <div className="absolute top-[67%] left-0 right-0 h-[1.2px] bg-blue-500/80"></div>
+                              {/* Inner Header top-bar in cell grid */}
+                              <div className={`border-b border-slate-800 px-1 py-0.5 flex justify-between items-center select-none transition-colors duration-200 ${
+                                isSelectedChar ? 'bg-purple-600 text-white border-b-purple-600' : 'bg-white text-black'
+                              }`}>
+                                <span className="text-[10px] font-black leading-none">{display}</span>
+                                <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelectedChar}
+                                    onChange={() => {
+                                      setSelectedSymbols(prev => {
+                                        if (prev.includes(char)) {
+                                          return prev.filter(c => c !== char);
+                                        } else {
+                                          return [...prev, char];
+                                        }
+                                      });
+                                    }}
+                                    className={`rounded text-[#7c3aed] focus:ring-purple-400 w-2.5 h-2.5 cursor-pointer accent-[#7c3aed] ${
+                                      isSelectedChar ? 'border-white bg-white' : 'border-slate-300'
+                                    }`}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Drawing field template guidelines exactly matching heights */}
+                              <div className="flex-1 relative">
+                                <div className="absolute inset-0 pointer-events-none opacity-[0.45] z-0">
+                                  {/* Horizontal guidances exactly matching heights */}
+                                  <div className="absolute top-[37%] left-0 right-0 h-[0.5px] bg-slate-300 border-dashed"></div>
+                                  <div className="absolute top-[67%] left-0 right-0 h-[1.1px] bg-blue-500/80"></div>
+                                </div>
+
+                                {/* Faint guide character trace */}
+                                {printWithLetter && (
+                                  <svg viewBox="0 0 100 100" className={`absolute inset-0 w-full h-full pointer-events-none select-none transition-colors duration-200 ${
+                                    isSelectedChar ? 'text-purple-600/15' : 'text-purple-900/10'
+                                  }`}>
+                                    <text 
+                                      x="50" 
+                                      y="67" 
+                                      textAnchor="middle" 
+                                      fontFamily="'Marck Script', 'Caveat', 'Neucha', 'Bad Script', cursive, sans-serif" 
+                                      fontSize="75" 
+                                      fill="currentColor"
+                                    >
+                                      {display}
+                                    </text>
+                                  </svg>
+                                )}
+
+                                {/* Selection overlay check emblem */}
+                                {isSelectedChar && (
+                                  <div className="absolute bottom-1.5 right-1.5 bg-purple-600 text-white rounded-full p-0.5 shadow-sm transform scale-110">
+                                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3.5">
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           );
-                        }
-
-                        const displayCharMap: Record<string, string> = {
-                          '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\Delta': 'Δ',
-                          '\\theta': 'θ', '\\lambda': 'λ', '\\mu': 'μ', '\\rho': 'ρ', '\\sigma': 'σ',
-                          '\\phi': 'φ', '\\psi': 'ψ', '\\omega': 'ω', '\\Omega': 'Ω',
-                          '\\degree': '°', '\\pm': '±', '\\times': '×', '\\div': '÷',
-                          '\\approx': '≈', '\\ne': '≠', '\\neq': '≠', '\\le': '≤', '\\ge': '≥',
-                          '\\partial': '∂', '\\nabla': '∇', '\\infty': '∞', '\\hbar': 'ħ',
-                          '\\int': '∫', '\\sum': '∑', '\\sqrt': '√', '\\pi': 'π'
-                        };
-                        const display = displayCharMap[char] || char;
-
-                        return (
-                          <div 
-                            key={index} 
-                            className="border border-slate-800 bg-white relative flex flex-col overflow-hidden"
-                          >
-                            {/* Inner Header top-bar in cell grid */}
-                            <div className="border-b border-slate-800 px-2.5 py-1 bg-white flex justify-between items-center select-none">
-                              <span className="text-xs font-black text-black leading-none">{display}</span>
-                            </div>
-
-                            {/* Drawing field template guidelines exactly matching heights */}
-                            <div className="flex-1 relative">
-                              <div className="absolute inset-0 pointer-events-none opacity-[0.45] z-0">
-                                {/* Horizontal guidances exactly matching heights */}
-                                <div className="absolute top-[37%] left-0 right-0 h-[0.5px] bg-slate-300 border-dashed"></div>
-                                <div className="absolute top-[67%] left-0 right-0 h-[1.2px] bg-blue-500/80"></div>
-                              </div>
-
-                              {/* Faint guide character trace */}
-                              {printWithLetter && (
-                                <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full text-purple-900/10 pointer-events-none select-none">
-                                  <text 
-                                    x="50" 
-                                    y="67" 
-                                    textAnchor="middle" 
-                                    fontFamily="'Marck Script', 'Caveat', 'Neucha', 'Bad Script', cursive, sans-serif" 
-                                    fontSize="75" 
-                                    fill="currentColor"
-                                  >
-                                    {display}
-                                  </text>
-                                </svg>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
+                        });
+                      })()}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1844,10 +2072,12 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                   <div className="flex flex-wrap gap-1 bg-slate-100/80 p-1 rounded-xl text-[10px] font-bold border border-slate-200/50">
                     {[
                       { id: 'all', label: 'Все символы' },
-                      { id: 'cyrillic', label: 'Кириллица' },
-                      { id: 'latin', label: 'Латиница' },
+                      { id: 'cyrillic', label: 'Кириллица (RU/UA/BY)' },
+                      { id: 'latin', label: 'Латиница (English)' },
+                      { id: 'kazakh', label: 'Казахский' },
+                      { id: 'european', label: 'Диакритика' },
                       { id: 'numbers', label: 'Цифры' },
-                      { id: 'custom_builder', label: 'Конконструктор А4' },
+                      { id: 'custom_builder', label: 'Конструктор А4' },
                       { id: 'filled', label: 'Отрисованные' }
                     ].map(f => (
                       <button
@@ -2434,6 +2664,50 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
           </div>
         )}
       </AnimatePresence>
+
+      {printErrorModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[9999] px-4 animate-fade-in" id="print-error-modal">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-150 transform scale-100 transition-transform flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-3 text-amber-500 mb-4">
+                <span className="text-3xl">⚠️</span>
+                <h3 className="text-lg font-black text-slate-800 leading-tight">Печать заблокирована браузером</h3>
+              </div>
+              
+              <p className="text-sm text-slate-600 mb-4 leading-relaxed font-semibold">
+                Так как приложение запущенно во встроенном фрейме (внутри Google AI Studio), ваш браузер из соображений безопасности запрещает запуск диалогового окна печати.
+              </p>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6">
+                <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider mb-2">Как запустить печать:</h4>
+                <ol className="text-xs text-slate-600 font-bold space-y-2 list-decimal list-inside">
+                  <li>Нажмите кнопку ниже, чтобы открыть приложение в новой вкладке.</li>
+                  <li>Нажмите там <strong className="text-purple-600">«Печать бланка»</strong> еще раз. Всё сработает мгновенно!</li>
+                </ol>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  window.open(window.location.href, '_blank');
+                  setPrintErrorModal(false);
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-[#7c3aed] hover:bg-purple-700 text-white font-extrabold text-sm py-3 px-4 rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                <span>Открыть в новой вкладке и печатать</span>
+              </button>
+              
+              <button
+                onClick={() => setPrintErrorModal(false)}
+                className="w-full text-center text-xs font-bold text-slate-500 hover:text-slate-800 transition-all py-2 cursor-pointer"
+              >
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
