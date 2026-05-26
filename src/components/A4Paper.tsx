@@ -357,8 +357,26 @@ function HandwritingPageSVG({
         {/* Margins */}
         {config.showMargins && (
           <pattern id={`margins-${id}`} width={PAGE_WIDTH} height={PAGE_HEIGHT} patternUnits="userSpaceOnUse">
-            <line x1={config.margins.left} y1="0" x2={config.margins.left} y2={PAGE_HEIGHT} stroke="#ec7c7c" strokeWidth="1.2" strokeDasharray="4 2" />
-            <line x1={PAGE_WIDTH - config.margins.right} y1="0" x2={PAGE_WIDTH - config.margins.right} y2={PAGE_HEIGHT} stroke="#ec7c7c" strokeWidth="1" strokeDasharray="4 2" />
+            <line 
+              x1={config.margins.left} 
+              y1="0" 
+              x2={config.margins.left} 
+              y2={PAGE_HEIGHT} 
+              stroke="#ec7c7c" 
+              strokeWidth="0.75" 
+              opacity={config.linesOpacity !== undefined ? config.linesOpacity : 0.12} 
+              strokeDasharray="4 3" 
+            />
+            <line 
+              x1={PAGE_WIDTH - config.margins.right} 
+              y1="0" 
+              x2={PAGE_WIDTH - config.margins.right} 
+              y2={PAGE_HEIGHT} 
+              stroke="#ec7c7c" 
+              strokeWidth="0.6" 
+              opacity={(config.linesOpacity !== undefined ? config.linesOpacity : 0.12) * 0.8} 
+              strokeDasharray="4 3" 
+            />
           </pattern>
         )}
 
@@ -371,7 +389,15 @@ function HandwritingPageSVG({
             patternUnits="userSpaceOnUse"
             patternTransform={`translate(0, ${config.margins.top})`}
           >
-            <line x1="0" y1="0" x2={PAGE_WIDTH} y2="0" stroke="#cce6ff" strokeWidth="0.8" />
+            <line 
+              x1="0" 
+              y1="0" 
+              x2={PAGE_WIDTH} 
+              y2="0" 
+              stroke="#0066cc" 
+              strokeWidth="0.5" 
+              opacity={config.linesOpacity !== undefined ? config.linesOpacity : 0.12} 
+            />
           </pattern>
         )}
 
@@ -384,7 +410,14 @@ function HandwritingPageSVG({
             patternUnits="userSpaceOnUse"
             patternTransform={`translate(${config.margins.left}, ${config.margins.top})`}
           >
-            <rect width={config.lineSpacing} height={config.lineSpacing} fill="none" stroke="#e1f0fe" strokeWidth="0.7" />
+            <rect 
+              width={config.lineSpacing} 
+              height={config.lineSpacing} 
+              fill="none" 
+              stroke="#0066cc" 
+              strokeWidth="0.45" 
+              opacity={config.linesOpacity !== undefined ? config.linesOpacity : 0.12} 
+            />
           </pattern>
         )}
 

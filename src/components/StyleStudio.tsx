@@ -74,7 +74,20 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
   const [customExtraSymbols, setCustomExtraSymbols] = useState<string>('');
   const [selectedFontGridFilter, setSelectedFontGridFilter] = useState<string>('all');
   const [printWithLetter, setPrintWithLetter] = useState<boolean>(true);
+  const [templateLinesOpacity, setTemplateLinesOpacity] = useState<number>(0.12);
   const [printErrorModal, setPrintErrorModal] = useState<boolean>(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+  };
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   // Selected symbols for bulk custom print
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>(() => {
@@ -710,29 +723,30 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
           // ──────────────── BASELINE ≈ 33% -> 67% from top of drawing zone [Solid]
           const zoneH = cellH - 12;
           const guidelines = [
-            { id: 'xheight', yPct: 37, stroke: '#cbd5e1', width: 0.5, dash: '1.5,1.5' },
-            { id: 'baseline', yPct: 67, stroke: '#3b82f6', width: 1.0, dash: '' }
+            { id: 'xheight', yPct: 37, stroke: '#94a3b8', width: 0.4, dash: '2,2', opacity: templateLinesOpacity * 0.83 },
+            { id: 'baseline', yPct: 67, stroke: '#3b82f6', width: 0.45, dash: '', opacity: templateLinesOpacity }
           ];
 
           guidelines.forEach(g => {
             const ly = cellY + 12 + (g.yPct / 100) * zoneH;
-            svgStr += `<line x1="${cellX}" y1="${ly}" x2="${cellX + cellW}" y2="${ly}" stroke="${g.stroke}" stroke-width="${g.width}" ${g.dash ? `stroke-dasharray="${g.dash}"` : ''}/>`;
+            svgStr += `<line x1="${cellX}" y1="${ly}" x2="${cellX + cellW}" y2="${ly}" stroke="${g.stroke}" stroke-width="${g.width}" stroke-opacity="${g.opacity}" ${g.dash ? `stroke-dasharray="${g.dash}"` : ''}/>`;
           });
 
           // If background template letter is enabled, render it in beautiful handwriting font aligned exactly to baseline
+          // Extremely faint opacity (0.045) to ensure it acts as a very light watermark easily ignored during scans
           if (printWithLetter) {
-            svgStr += `<text x="${cellX + cellW / 2}" y="${cellY + 12 + 0.67 * zoneH}" font-family="&apos;Marck Script&apos;, &apos;Caveat&apos;, &apos;Neucha&apos;, &apos;Bad Script&apos;, cursive, sans-serif" font-size="40" fill="#6b21a8" fill-opacity="0.10" text-anchor="middle">${cleanDisplayChar}</text>`;
+            svgStr += `<text x="${cellX + cellW / 2}" y="${cellY + 12 + 0.67 * zoneH}" font-family="&apos;Marck Script&apos;, &apos;Caveat&apos;, &apos;Neucha&apos;, &apos;Bad Script&apos;, cursive, sans-serif" font-size="40" fill="#6b21a8" fill-opacity="0.045" text-anchor="middle">${cleanDisplayChar}</text>`;
           }
         } else {
           // Empty grid placeholders (showing lines)
           const zoneH = cellH - 12;
           const guidelines = [
-            { yPct: 37, stroke: '#cbd5e1', width: 0.5, dash: '1.5,1.5' },
-            { yPct: 67, stroke: '#3b82f6', width: 1.0, dash: '' }
+            { yPct: 37, stroke: '#94a3b8', width: 0.4, dash: '2,2', opacity: templateLinesOpacity * 0.83 },
+            { yPct: 67, stroke: '#3b82f6', width: 0.45, dash: '', opacity: templateLinesOpacity }
           ];
           guidelines.forEach(g => {
             const ly = cellY + 12 + (g.yPct / 100) * zoneH;
-            svgStr += `<line x1="${cellX}" y1="${ly}" x2="${cellX + cellW}" y2="${ly}" stroke="${g.stroke}" stroke-width="${g.width}" ${g.dash ? `stroke-dasharray="${g.dash}"` : ''}/>`;
+            svgStr += `<line x1="${cellX}" y1="${ly}" x2="${cellX + cellW}" y2="${ly}" stroke="${g.stroke}" stroke-width="${g.width}" stroke-opacity="${g.opacity}" ${g.dash ? `stroke-dasharray="${g.dash}"` : ''}/>`;
           });
         }
       }
@@ -1177,8 +1191,28 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
   };
 
   return (
-    <div className="bg-slate-50 rounded-3xl border border-slate-200/60 overflow-hidden shadow-2xl flex flex-col min-h-[750px]">
+    <div className="bg-slate-50 rounded-3xl border border-slate-200/60 overflow-hidden shadow-2xl flex flex-col min-h-[750px] relative">
       
+      {/* Toast floating notifications overlay */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className={`absolute top-6 left-1/2 -translate-x-1/2 z-[9999] px-4 py-3 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs font-bold leading-normal whitespace-nowrap ${
+              toast.type === 'success' 
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                : toast.type === 'error'
+                  ? 'bg-rose-50 border-rose-200 text-rose-800'
+                  : 'bg-blue-50 border-blue-200 text-slate-800'
+            }`}
+          >
+            <span>{toast.type === 'success' ? '✅' : toast.type === 'error' ? '❌' : 'ℹ️'}</span>
+            <span>{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Upper Navigation bar - replicating Calligraphr.com purple feel with our slate themes */}
       <div className="bg-[#7c3aed] text-white px-6 py-4 flex flex-col md:flex-row items-center justify-between border-b border-purple-600 gap-4 shadow-md">
         <div className="flex items-center gap-3">
@@ -1426,10 +1460,12 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
               )}
 
               {/* Toolbar in sheet page view */}
-              <div className="w-full max-w-[595px] bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-3">
+              {/* Toolbar in sheet page view */}
+              <div className="w-full max-w-[595px] bg-white border border-slate-200 p-4 rounded-3xl shadow-sm flex flex-col gap-3.5">
                 
-                {/* Pagination and Selection Controls */}
-                <div className="flex flex-wrap items-center gap-3 shrink-0">
+                {/* FIRST GEOMETRIC ROW: Pagination & Selection Helpers */}
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-3 w-full pb-2.5 border-b border-slate-100">
+                  {/* Left Side: Pagination */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setTemplatePageIndex(p => Math.max(0, p - 1))}
@@ -1450,7 +1486,7 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                     </button>
                   </div>
 
-                  {/* Selection controls */}
+                  {/* Right Side: Selection Buttons */}
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => {
@@ -1460,7 +1496,7 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                           return Array.from(union);
                         });
                       }}
-                      className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-250/60 rounded-xl transition-all cursor-pointer"
+                      className="px-2.5 py-1.5 text-[10px] font-extrabold uppercase text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200/60 rounded-xl transition-all cursor-pointer"
                       title="Выбрать все символы из данной категории шаблона"
                     >
                       Выбрать все
@@ -1489,53 +1525,92 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                   </div>
                 </div>
 
-                {/* Actions mimicking calligraphr bar */}
-                <div className="flex flex-wrap items-center justify-end gap-1.5 w-full animate-fade-in">
-                  <label className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs font-bold text-slate-700 cursor-pointer hover:bg-slate-50 transition-all shadow-xs">
-                    <input
-                      type="checkbox"
-                      checked={printWithLetter}
-                      onChange={(e) => setPrintWithLetter(e.target.checked)}
-                      className="rounded text-[#7c3aed] focus:ring-purple-400 w-3.5 h-3.5 cursor-pointer accent-[#7c3aed]"
-                    />
-                    <span>С фоновой буквой</span>
-                  </label>
+                {/* SECOND GEOMETRIC ROW: Actions / Printing & Export Filters */}
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-3 w-full">
+                  {/* Left Side: Watermark & Grid Line Brightness Controls via modern buttons! */}
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-center sm:justify-start">
+                    {/* Watermark Toggle button */}
+                    <button
+                      type="button"
+                      onClick={() => setPrintWithLetter(!printWithLetter)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-xl text-[11px] sm:text-xs font-extrabold transition-all select-none cursor-pointer shadow-3xs ${
+                        printWithLetter
+                          ? 'bg-[#7c3aed] text-white border-[#7c3aed] hover:bg-purple-700'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {printWithLetter ? '👁️ Водный знак' : '🚫 Без водного знака'}
+                    </button>
 
-                  <button
-                    onClick={() => handlePrintTemplate(false)}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-purple-50 text-[#7c3aed] border border-purple-100 rounded-xl text-xs font-bold hover:bg-purple-100 transition-all cursor-pointer"
-                    title="Распечатать только текущую страницу бланка"
-                  >
-                    <Printer size={13} />
-                    <span>Печать текущей</span>
-                  </button>
+                    {/* Grid Lines Brightness Controller Button Group */}
+                    <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/50">
+                      <span className="text-[9.5px] text-slate-500 font-extrabold uppercase px-1.5 shrink-0">Яркость линий:</span>
+                      {[
+                        { val: 0, label: '0%' },
+                        { val: 0.05, label: '5%' },
+                        { val: 0.12, label: '12%' },
+                        { val: 0.25, label: '25%' }
+                      ].map(item => (
+                        <button
+                          key={item.val}
+                          type="button"
+                          onClick={() => setTemplateLinesOpacity(item.val)}
+                          className={`px-2 py-1 text-[10px] sm:text-[10.5px] font-black rounded-lg transition-all cursor-pointer ${
+                            templateLinesOpacity === item.val
+                              ? 'bg-white text-slate-800 shadow-3xs border border-slate-200/40'
+                              : 'text-slate-500 hover:text-slate-800'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                  <button
-                    onClick={() => handlePrintTemplate(true)}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-[#7c3aed] text-white rounded-xl text-xs font-black shadow-sm shadow-purple-600/10 hover:bg-purple-700 transition-all cursor-pointer"
-                    title="Распечатать полностью все выбранные листы бланка"
-                  >
-                    <Printer size={13} />
-                    <span>Печать ВСЕХ ({Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) || 1} стр.)</span>
-                  </button>
-                  
-                  <button
-                    onClick={handleDownloadSVG}
-                    className="flex items-center gap-1 px-3 py-2 border border-slate-200 bg-white text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer"
-                    title="Векторный SVG"
-                  >
-                    <Download size={13} className="text-purple-600" />
-                    <span>SVG</span>
-                  </button>
+                  {/* Right Side: Segmented Actions for Print or Download */}
+                  <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 w-full sm:w-auto">
+                    {/* Segment 1: Print (Purple Box) */}
+                    <div className="flex items-center bg-purple-50/50 border border-purple-100 p-0.5 rounded-xl gap-0.5 shadow-xs shrink-0">
+                      <button
+                        onClick={() => handlePrintTemplate(false)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-purple-700 hover:bg-purple-100/60 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer"
+                        title="Распечатать только текущую страницу бланка"
+                      >
+                        <Printer size={13} strokeWidth={2.5} />
+                        <span>Текущая стр.</span>
+                      </button>
+                      <div className="w-[1px] h-4 bg-purple-200/50 self-center"></div>
+                      <button
+                        onClick={() => handlePrintTemplate(true)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#7c3aed] text-white rounded-lg text-[11px] sm:text-xs font-extrabold shadow-sm shadow-purple-600/15 hover:bg-purple-700 transition-all cursor-pointer"
+                        title="Распечатать полностью все выбранные листы бланка"
+                      >
+                        <Printer size={13} />
+                        <span>Все ({Math.ceil(getFilteredCharList(selectedTemplateGroup).length / 64) || 1})</span>
+                      </button>
+                    </div>
 
-                  <button
-                    onClick={handleDownloadPNG}
-                    className="flex items-center gap-1 px-3 py-2 border border-slate-200 bg-white text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer"
-                    title="Высококачественный PNG"
-                  >
-                    <Download size={13} className="text-slate-500" />
-                    <span>PNG</span>
-                  </button>
+                    {/* Segment 2: Export (Slate Box) */}
+                    <div className="flex items-center bg-slate-50/50 border border-slate-200 p-0.5 rounded-xl gap-0.5 shadow-xs shrink-0">
+                      <button
+                        onClick={handleDownloadSVG}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-slate-700 font-bold hover:bg-slate-100 rounded-lg text-[11px] sm:text-xs transition-all cursor-pointer"
+                        title="Выгрузить в векторный формат SVG"
+                      >
+                        <Download size={13} className="text-purple-600" />
+                        <span>SVG</span>
+                      </button>
+                      <div className="w-[1px] h-4 bg-slate-200"></div>
+                      <button
+                        onClick={handleDownloadPNG}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-slate-700 font-bold hover:bg-slate-100 rounded-lg text-[11px] sm:text-xs transition-all cursor-pointer"
+                        title="Выгрузить в высококачественное изображение PNG"
+                      >
+                        <Download size={13} className="text-blue-500" />
+                        <span>PNG</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1597,13 +1672,13 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                             return (
                               <div 
                                 key={index} 
-                                className="border border-slate-850 bg-[#fafafa]/50 relative flex flex-col justify-between p-1 overflow-hidden"
+                                className="border border-slate-800 bg-[#fafafa]/50 relative flex flex-col justify-between p-1 overflow-hidden"
                               >
                                 {/* Guidelines grid divisions mock with baseline ≈ 33% */}
-                                <div className="absolute inset-0 pointer-events-none opacity-[0.35] z-0">
-                                  <div className="absolute top-[12px] left-0 right-0 h-[0.5px] bg-slate-300"></div>
-                                  <div className="absolute top-[37%] left-0 right-0 h-[0.5px] bg-slate-300 border-dashed"></div>
-                                  <div className="absolute top-[67%] left-0 right-0 h-[1.2px] bg-blue-500/80"></div>
+                                <div className="absolute inset-0 pointer-events-none z-0" style={{ opacity: templateLinesOpacity }}>
+                                  <div className="absolute top-[12px] left-0 right-0 h-[0.5px] bg-slate-400"></div>
+                                  <div className="absolute top-[37%] left-0 right-0 h-[0.5px] bg-slate-400 border-dashed"></div>
+                                  <div className="absolute top-[67%] left-0 right-0 h-[1.1px] bg-blue-500"></div>
                                 </div>
                               </div>
                             );
@@ -1664,18 +1739,18 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                                 </div>
                               </div>
 
-                              {/* Drawing field template guidelines exactly matching heights */}
+                              {/* Drawing field template guidelines exactly matching heights -> extremely light/watermark opacity */}
                               <div className="flex-1 relative">
-                                <div className="absolute inset-0 pointer-events-none opacity-[0.45] z-0">
+                                <div className="absolute inset-0 pointer-events-none z-0" style={{ opacity: templateLinesOpacity }}>
                                   {/* Horizontal guidances exactly matching heights */}
-                                  <div className="absolute top-[37%] left-0 right-0 h-[0.5px] bg-slate-300 border-dashed"></div>
-                                  <div className="absolute top-[67%] left-0 right-0 h-[1.1px] bg-blue-500/80"></div>
+                                  <div className="absolute top-[37%] left-0 right-0 h-[0.5px] bg-slate-400 border-dashed"></div>
+                                  <div className="absolute top-[67%] left-0 right-0 h-[1px] bg-blue-500"></div>
                                 </div>
 
-                                {/* Faint guide character trace */}
+                                {/* Faint guide character trace (watermark-like) */}
                                 {printWithLetter && (
                                   <svg viewBox="0 0 100 100" className={`absolute inset-0 w-full h-full pointer-events-none select-none transition-colors duration-200 ${
-                                    isSelectedChar ? 'text-purple-600/15' : 'text-purple-900/10'
+                                    isSelectedChar ? 'text-purple-600/[0.045]' : 'text-purple-900/[0.035]'
                                   }`}>
                                     <text 
                                       x="50" 

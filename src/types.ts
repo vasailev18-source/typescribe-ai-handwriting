@@ -44,6 +44,7 @@ export interface PageConfig {
   paperTexture?: 'clean' | 'fiber' | 'copy' | 'vintage'; // Realistic paper styles & scanner filters
   paperEffect?: 'none' | 'shadow' | 'scanner' | 'crumpled'; // Photoreal scanner effects & camera shadows
   textOutlineColor?: string; // Custom text outline color (e.g. for highlights/stroke)
+  linesOpacity?: number; // Opacity level of rulings/grids & margin lines [0, 1]
 }
 
 export interface GenerationHistory {
@@ -85,4 +86,3 @@ export interface Drawing {
   url?: string;
   paths?: Array<Array<[number, number]>>;
 }
-

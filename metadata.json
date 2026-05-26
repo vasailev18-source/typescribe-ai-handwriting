@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "TypeScribe AI",
+  "description": "Приложение для реалистичной имитации почерка и каллиграфии на основе ИИ с поддержкой различных стилей пера, бумаги и экспорта в PDF.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

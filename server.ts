@@ -72,7 +72,11 @@ app.post('/api/gemini/optimize-text', async (req, res) => {
   }
 
   try {
-    const prompt = `Take the following note containing textual or scientific comments and rewrite it to be neat, readable, beautifully summarizing points, and inserting math-friendly symbols where possible for pristine handwriting rendering:\n\n${text}\n\nReturn ONLY the revised text ready for printing.`;
+    const prompt = `Take the following note containing textual or scientific comments and rewrite it to be neat, readable, beautifully summarizing points, and inserting math-friendly symbols where possible for pristine handwriting rendering.
+Any mathematical equations and formulas MUST be formatted strictly using standard double-dollar signs on their own separate lines, like:
+$$ \\int_{a}^{b} x^2 dx = \\frac{b^3 - a^3}{3} $$
+
+Never format equations inside inline text or single-dollar signs if they are complex; instead, move complex formulas to their own lines wrapped in double dollars ($$). Keep text comments in Russian or the same language as input. Return ONLY the revised text ready for printing, with no outer markdown wrapping or meta-comments.\n\n${text}`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.5-flash',

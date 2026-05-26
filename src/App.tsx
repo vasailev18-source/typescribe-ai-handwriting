@@ -25,7 +25,13 @@ import {
   Table2,
   Plus,
   PlusCircle,
-  RotateCcw
+  RotateCcw,
+  ChevronDown,
+  Image as ImageIcon,
+  Eraser,
+  Undo,
+  Redo,
+  MoreHorizontal
 } from 'lucide-react';
 
 export const TOOL_META = {
@@ -641,7 +647,8 @@ export default function App() {
     showMargins: true,
     curvedLines: true,
     paperTexture: 'clean',
-    paperEffect: 'none'
+    paperEffect: 'none',
+    linesOpacity: 0.12
   });
 
   // Synchronize Custom Hex Input with active color values (Ink color vs. Text outline)
@@ -726,6 +733,48 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [newSigName, setNewSigName] = useState<string>('');
   const [newSigText, setNewSigText] = useState<string>('');
+
+  // Rich MS Word-like editor toolbar & fullscreen states
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [textHistory, setTextHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  // Initialize history
+  useEffect(() => {
+    if (textInput && textHistory.length === 0) {
+      setTextHistory([textInput]);
+      setHistoryIndex(0);
+    }
+  }, [textInput]);
+
+  const updateTextAndHistory = (newVal: string) => {
+    setTextInput(newVal);
+    const sliced = textHistory.slice(0, historyIndex + 1);
+    const updated = [...sliced, newVal];
+    setTextHistory(updated);
+    setHistoryIndex(sliced.length);
+  };
+
+  const handleTextareaChange = (newVal: string) => {
+    setTextInput(newVal);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const prevIdx = historyIndex - 1;
+      setHistoryIndex(prevIdx);
+      setTextInput(textHistory[prevIdx]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < textHistory.length - 1) {
+      const nextIdx = historyIndex + 1;
+      setHistoryIndex(nextIdx);
+      setTextInput(textHistory[nextIdx]);
+    }
+  };
 
   const [drawings, setDrawings] = useState<Record<string, Drawing>>({
     'drawing-default-cone': {
@@ -922,7 +971,7 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
       }
     }));
 
-    setTextInput(prev => prev + `\n[drawing:${finalId}]\n`);
+    updateTextAndHistory(textInput + `\n[drawing:${finalId}]\n`);
   };
 
   // Get active signature text
@@ -947,7 +996,7 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
   };
 
   const insertLaTeXTemplate = (template: string) => {
-    setTextInput(prev => prev + `\n$$ ${template} $$`);
+    updateTextAndHistory(textInput + `\n$$ ${template} $$`);
   };
 
   const insertTableTemplate = (type: 'ruler' | 'handdrawn' | 'printed') => {
@@ -956,7 +1005,7 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
       : type === 'printed'
       ? `\n[table:printed]\n| Товар | Кол-во | Цена |\n| Книга | 1      | 450р |\n| Ручка | 3      | 30р  |\n[endtable]\n`
       : `\n[table:handdrawn]\n| Товар | Кол-во | Цена |\n| Книга | 1      | 450р |\n| Ручка | 3      | 30р  |\n[endtable]\n`;
-    setTextInput(prev => prev + template);
+    updateTextAndHistory(textInput + template);
   };
 
   const handleAISummarize = async () => {
@@ -1040,7 +1089,7 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
               className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start"
             >
               {/* Left Column Controls */}
-              <div className="lg:col-span-5 flex flex-col gap-6">
+              <div className="lg:col-span-6 flex flex-col gap-6">
 
                 {/* Handwriting Selection Panel with Elegant Dropdown */}
                 <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm relative z-35 font-sans" id="handwriting-dropdown-panel">
@@ -1240,149 +1289,638 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
                   </div>
                 </div>
 
-                {/* Text & LaTeX input panel */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest block">
-                      Текст для конвертации
-                    </span>
+                {/* Text & LaTeX input panel with rich Word-style toolbar */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden flex flex-col transition-all relative">
+                  {activeDropdown && (
+                    <div 
+                      className="fixed inset-0 z-40 bg-transparent cursor-default" 
+                      onClick={() => setActiveDropdown(null)} 
+                    />
+                  )}
+                  {/* Word-Style Rich Toolbar (Row 1) */}
+                  <div className="bg-slate-50/80 border-b border-gray-100 p-2.5 flex flex-wrap gap-1.5 items-center select-none text-slate-700">
+                    {/* 1. Highlight / Ink Color */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveDropdown(activeDropdown === 'color' ? null : 'color')}
+                        className={`flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          activeDropdown === 'color' ? 'bg-white border-blue-400 text-blue-600 shadow-xs' : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                        title="Цвет чернил"
+                      >
+                        <span className="font-extrabold text-sm relative border-b-3 px-0.5 leading-none transition-all" style={{ borderBottomColor: config.inkColor }}>
+                          А
+                        </span>
+                        <ChevronDown size={10} className="text-gray-400" />
+                      </button>
+                      {activeDropdown === 'color' && (
+                        <div className="absolute top-[110%] left-0 z-50 w-52 bg-white border border-gray-200 rounded-xl shadow-xl p-2 animate-in fade-in duration-100">
+                          <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1 px-1">Цвет ручки</span>
+                          <div className="grid grid-cols-2 gap-1">
+                            {[
+                              { id: 'blue', name: 'Синий', hex: '#1d3f94' },
+                              { id: 'black', name: 'Черный', hex: '#17171a' },
+                              { id: 'red', name: 'Красный', hex: '#c91818' },
+                              { id: 'purple', name: 'Фиолет', hex: '#5c2090' },
+                              { id: 'green', name: 'Зеленый', hex: '#14612d' },
+                              { id: 'brown', name: 'Корич.', hex: '#7a431d' },
+                            ].map((c) => (
+                              <button
+                                key={c.id}
+                                onClick={() => {
+                                  setConfig({ ...config, inkColor: c.id });
+                                  setActiveDropdown(null);
+                                }}
+                                className="flex items-center gap-1.5 p-1 rounded-md hover:bg-slate-50 text-[11px] font-semibold text-slate-600 cursor-pointer"
+                              >
+                                <span className="w-3.5 h-3.5 rounded-full border border-black/10 flex-shrink-0" style={{ backgroundColor: c.hex }} />
+                                <span className="truncate">{c.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Separator */}
+                    <span className="text-gray-300">|</span>
+
+                    {/* 2. Insert Image/Drawing */}
                     <button
-                      onClick={handleAISummarize}
-                      disabled={isTranslating}
-                      className="flex items-center gap-1 text-[11px] font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded-md hover:bg-purple-100 border border-purple-100 transition-all cursor-pointer"
+                      type="button"
+                      onClick={() => {
+                        insertDrawingIntoText();
+                        // Display visual confirmation
+                        const originalText = textInput;
+                        const alertId = setTimeout(() => {}, 1000);
+                      }}
+                      className="p-1 px-1.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg text-slate-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                      title="Вставить текущий рисунок"
                     >
-                      <Sparkles size={11} />
-                      <span>{isTranslating ? 'Улучшение...' : 'Улучшить с AI'}</span>
+                      <ImageIcon size={14} className="text-emerald-600" />
+                    </button>
+
+                    {/* 3. Insert Table Dropdown */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveDropdown(activeDropdown === 'table' ? null : 'table')}
+                        className={`flex items-center gap-1 px-1.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          activeDropdown === 'table' ? 'bg-white border-blue-400 text-blue-600 shadow-xs' : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                        title="Вставить таблицу"
+                      >
+                        <Table2 size={14} className="text-purple-600" />
+                        <ChevronDown size={10} className="text-gray-400" />
+                      </button>
+                      {activeDropdown === 'table' && (
+                        <div className="absolute top-[110%] left-0 z-50 w-56 bg-white border border-gray-200 rounded-xl shadow-xl p-2 animate-in fade-in duration-100">
+                          <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1.5 px-1">Шаблоны таблиц</span>
+                          <div className="flex flex-col gap-1">
+                            <button
+                              onClick={() => {
+                                insertTableTemplate('ruler');
+                                setActiveDropdown(null);
+                              }}
+                              className="w-full text-left p-1.5 rounded-lg hover:bg-purple-50 hover:text-purple-700 text-xs font-bold transition-all cursor-pointer"
+                            >
+                              📏 Нарисовать по линейке
+                            </button>
+                            <button
+                              onClick={() => {
+                                insertTableTemplate('handdrawn');
+                                setActiveDropdown(null);
+                              }}
+                              className="w-full text-left p-1.5 rounded-lg hover:bg-orange-50 hover:text-orange-700 text-xs font-bold transition-all cursor-pointer"
+                            >
+                              ✍️ Слегка неровно от руки
+                            </button>
+                            <button
+                              onClick={() => {
+                                insertTableTemplate('printed');
+                                setActiveDropdown(null);
+                              }}
+                              className="w-full text-left p-1.5 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 text-xs font-bold transition-all cursor-pointer"
+                            >
+                              🖨️ Печатная таблица
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Separator */}
+                    <span className="text-gray-300">|</span>
+
+                    {/* 4. Font Family Selector (Шрифт) */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveDropdown(activeDropdown === 'font' ? null : 'font')}
+                        className={`flex items-center gap-1.5 px-2 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          activeDropdown === 'font' ? 'bg-white border-blue-400 text-blue-600 shadow-xs' : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                        title="Сменить почерк/шрифт"
+                      >
+                        <span className="max-w-[80px] truncate text-[11px]">
+                          Шрифт: {activeStyle ? activeStyle.name : 'по умолчанию'}
+                        </span>
+                        <ChevronDown size={10} className="text-gray-400 flex-shrink-0" />
+                      </button>
+                      {activeDropdown === 'font' && (
+                        <div className="absolute top-[110%] left-0 z-50 w-56 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl p-2 animate-in fade-in duration-100">
+                          <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block mb-1 px-1">Выбрать почерк</span>
+                          <div className="flex flex-col gap-0.5">
+                            {styles.map((s) => (
+                              <button
+                                key={s.id}
+                                onClick={() => {
+                                  setSelectedStyleId(s.id);
+                                  setActiveDropdown(null);
+                                }}
+                                className={`w-full text-left p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex justify-between items-center ${
+                                  s.id === selectedStyleId ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-700'
+                                }`}
+                              >
+                                <span className="truncate">{s.name}</span>
+                                {s.id === selectedStyleId && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 5. Font Size Selector (Размер) */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveDropdown(activeDropdown === 'size' ? null : 'size')}
+                        className={`flex items-center gap-1.5 px-2 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          activeDropdown === 'size' ? 'bg-white border-blue-400 text-blue-600 shadow-xs' : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                        title="Размер букв"
+                      >
+                        <span className="text-[11px]">{fontSize}px</span>
+                        <ChevronDown size={10} className="text-gray-400" />
+                      </button>
+                      {activeDropdown === 'size' && (
+                        <div className="absolute top-[110%] left-0 z-50 w-28 bg-white border border-gray-200 rounded-xl shadow-xl p-1.5 animate-in fade-in duration-100">
+                          {[16, 18, 20, 22, 24, 26, 28, 30, 32, 36].map((sz) => (
+                            <button
+                              key={sz}
+                              onClick={() => {
+                                setFontSize(sz);
+                                setActiveDropdown(null);
+                              }}
+                              className={`w-full text-left p-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                                sz === fontSize ? 'bg-blue-50 text-blue-600' : 'hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              {sz}px
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 6. Paper Format Dropdown (Формат) */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveDropdown(activeDropdown === 'format' ? null : 'format')}
+                        className={`flex items-center gap-1.5 px-2 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          activeDropdown === 'format' ? 'bg-white border-blue-400 text-blue-600 shadow-xs' : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                        title="Формат разметки страницы"
+                      >
+                        <span className="text-[11px]">
+                          {config.paperType === 'lined' ? 'Линейка' : config.paperType === 'squared' ? 'Клетка' : 'Чистый'}
+                        </span>
+                        <ChevronDown size={10} className="text-gray-400" />
+                      </button>
+                      {activeDropdown === 'format' && (
+                        <div className="absolute top-[110%] left-0 z-50 w-36 bg-white border border-gray-200 rounded-xl shadow-xl p-1.5 animate-in fade-in duration-100">
+                          {[
+                            { id: 'lined', label: '✍️ Линейка' },
+                            { id: 'squared', label: '🎚️ Клетка' },
+                            { id: 'blank', label: '📄 Чистый лист' },
+                          ].map((f) => (
+                            <button
+                              key={f.id}
+                              onClick={() => {
+                                setConfig({ ...config, paperType: f.id as any });
+                                setActiveDropdown(null);
+                              }}
+                              className={`w-full text-left p-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                                f.id === config.paperType ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              {f.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Separator */}
+                    <span className="text-gray-300">|</span>
+
+                    {/* 7. Clear Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm('Очистить весь редактируемый текст?')) {
+                          updateTextAndHistory('');
+                        }
+                      }}
+                      className="p-1 px-1.5 bg-white border border-gray-200 hover:border-red-200 hover:bg-red-50 hover:text-red-500 rounded-lg text-slate-500 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                      title="Очистить текст"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+
+                    {/* 8. Help Button */}
+                    <button
+                      type="button"
+                      onClick={() => setFontsInfoModal(true)}
+                      className="p-1 px-1.5 bg-white border border-gray-200 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-500 rounded-lg text-slate-500 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                      title="Справка по тегам и формулам"
+                    >
+                      <HelpCircle size={13} />
+                    </button>
+
+                    {/* 9. Show Margins Option */}
+                    <button
+                      type="button"
+                      onClick={() => setConfig({ ...config, showMargins: !config.showMargins })}
+                      className={`p-1 px-1.5 border rounded-lg flex items-center justify-center transition-all cursor-pointer shadow-2xs ${
+                        config.showMargins ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-200 text-slate-500 hover:bg-slate-50'
+                      }`}
+                      title={config.showMargins ? 'Скрыть поля листа' : 'Показать красные поля'}
+                    >
+                      <span className="font-bold text-[10px]">≡</span>
+                    </button>
+
+                    {/* 10. Line Spacing Dropdown (T↕) */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveDropdown(activeDropdown === 'spacing' ? null : 'spacing')}
+                        className={`flex items-center gap-1 px-1.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          activeDropdown === 'spacing' ? 'bg-white border-blue-400 text-blue-600 shadow-xs' : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                        title="Интервал строк (T↕)"
+                      >
+                        <span className="text-[10px] font-mono">T↕ {config.lineSpacing}</span>
+                        <ChevronDown size={8} className="text-gray-400" />
+                      </button>
+                      {activeDropdown === 'spacing' && (
+                        <div className="absolute top-[110%] left-0 z-50 w-32 bg-white border border-gray-200 rounded-xl shadow-xl p-1.5 animate-in fade-in duration-100">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase block mb-1 px-1">Межстрочный</span>
+                          {[22, 24, 26, 28, 30, 32, 34, 36, 40].map((ls) => (
+                            <button
+                              key={ls}
+                              onClick={() => {
+                                setConfig({ ...config, lineSpacing: ls });
+                                setActiveDropdown(null);
+                              }}
+                              className={`w-full text-left p-1 rounded-sm text-xs font-semibold cursor-pointer ${
+                                ls === config.lineSpacing ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              {ls}px
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 11. Stroke Thickness (A↕) */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveDropdown(activeDropdown === 'thickness' ? null : 'thickness')}
+                        className={`flex items-center gap-1 px-1.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          activeDropdown === 'thickness' ? 'bg-white border-blue-400 text-blue-600 shadow-xs' : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                        title="Толщина пера"
+                      >
+                        <span className="text-[10px] font-mono">A↕ {config.strokeThickness}</span>
+                        <ChevronDown size={8} className="text-gray-400" />
+                      </button>
+                      {activeDropdown === 'thickness' && (
+                        <div className="absolute top-[110%] left-0 z-50 w-32 bg-white border border-gray-200 rounded-xl shadow-xl p-1.5 animate-in fade-in duration-100">
+                          <span className="text-[9px] font-bold text-gray-400 uppercase block mb-1 px-1">Толщина пера</span>
+                          {[0.8, 1.1, 1.4, 1.6, 1.8, 2.0, 2.5].map((st) => (
+                            <button
+                              key={st}
+                              onClick={() => {
+                                setConfig({ ...config, strokeThickness: st });
+                                setActiveDropdown(null);
+                              }}
+                              className={`w-full text-left p-1 rounded-sm text-xs font-semibold cursor-pointer ${
+                                st === config.strokeThickness ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              {st}px
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 12. Eraser Tag/Format Striper Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Stripping markup tags like [style] and [print] leaving raw clean text
+                        const cleanText = textInput
+                          .replace(/\[\/?style.*?\]/g, '')
+                          .replace(/\[\/?print.*?\]/g, '')
+                          .replace(/\[\/?line.*?\]/g, '')
+                          .replace(/\[drawing:.*?\]/g, '');
+                        updateTextAndHistory(cleanText);
+                      }}
+                      className="p-1 px-1.5 bg-white border border-gray-200 hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 rounded-lg text-slate-500 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                      title="Очистить теги оформления (Стереть)"
+                    >
+                      <Eraser size={13} />
                     </button>
                   </div>
 
-                  <textarea
-                    value={textInput}
-                    onChange={(e) => setTextInput(e.target.value)}
-                    rows={8}
-                    className="w-full bg-gray-50 border border-gray-200 focus:border-blue-500 outline-none rounded-xl p-4 text-xs font-medium leading-relaxed font-sans shadow-inner placeholder-gray-400"
-                    placeholder="Введите ваши конспекты, абзацы или LaTeX формулы..."
-                  />
+                  {/* Word-Style Rich Toolbar (Row 2) */}
+                  <div className="bg-slate-50/50 border-b border-gray-100 p-2 flex flex-wrap gap-2 items-center justify-between text-slate-600 text-xs">
+                    {/* Left presets group */}
+                    <div className="flex gap-1.5 items-center">
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setActiveDropdown(activeDropdown === 'auto' ? null : 'auto')}
+                          className="px-2 py-1 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg text-slate-700 font-bold text-[11px] flex items-center gap-1 cursor-pointer shadow-2xs"
+                        >
+                          <span>🪄 Автонастройка</span>
+                          <ChevronDown size={10} className="text-gray-400" />
+                        </button>
+                        {activeDropdown === 'auto' && (
+                          <div className="absolute top-[110%] left-0 z-50 w-60 bg-white border border-gray-200 rounded-xl shadow-xl p-2 animate-in fade-in duration-100">
+                            <span className="text-[9.5px] font-black text-gray-400 uppercase block mb-1 px-1.5">Пресеты оформления</span>
+                            <div className="flex flex-col gap-0.5">
+                              <button
+                                onClick={async () => {
+                                  setActiveDropdown(null);
+                                  handleAISummarize();
+                                }}
+                                className="w-full text-left p-1.5 rounded-lg hover:bg-purple-50 hover:text-purple-700 text-xs font-extrabold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Sparkles size={11} className="text-purple-600" />
+                                <span>Улучшить текст с AI (Gemini)</span>
+                              </button>
+                              <div className="h-px bg-slate-100 my-1" />
+                              <button
+                                onClick={() => {
+                                  setSelectedStyleId('caveat-font');
+                                  setConfig({
+                                    ...config,
+                                    paperType: 'lined',
+                                    lineSpacing: 28,
+                                    strokeThickness: 1.4,
+                                    inkColor: 'blue',
+                                  });
+                                  setFontSize(24);
+                                  setActiveDropdown(null);
+                                }}
+                                className="w-full text-left p-1.5 rounded-lg hover:bg-blue-50 text-xs font-semibold cursor-pointer"
+                              >
+                                🏫 Конспект студента-отличника
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedStyleId('caveat-font');
+                                  setConfig({
+                                    ...config,
+                                    paperType: 'squared',
+                                    lineSpacing: 24,
+                                    strokeThickness: 1.1,
+                                    inkColor: 'black',
+                                  });
+                                  setFontSize(20);
+                                  setActiveDropdown(null);
+                                }}
+                                className="w-full text-left p-1.5 rounded-lg hover:bg-slate-50 text-xs font-semibold cursor-pointer"
+                              >
+                                📝 Быстрые зарисовки карандашом
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                  {/* Math Injection Templates */}
-                  <div className="mt-3">
+                    {/* Right actions: Fullscreen, Undo, Redo, More */}
+                    <div className="flex gap-1 items-center">
+                      {/* Fullscreen Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsFullscreen(true)}
+                        className="p-1 px-2 bg-white hover:bg-blue-50 border border-gray-200 hover:border-blue-200 text-blue-600 font-extrabold rounded-lg text-[10.5px] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                        title="Полноэкранный режим"
+                      >
+                        <Maximize2 size={12} />
+                        <span>Полноэкранный</span>
+                      </button>
+
+                      {/* Separator */}
+                      <span className="text-gray-300">|</span>
+
+                      {/* Undo Button */}
+                      <button
+                        type="button"
+                        onClick={handleUndo}
+                        disabled={historyIndex <= 0}
+                        className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
+                          historyIndex > 0 ? 'bg-white border-gray-200 hover:bg-gray-50 text-slate-700' : 'bg-slate-50 border-slate-100 text-gray-300'
+                        }`}
+                        title="Шаг назад (Undo)"
+                      >
+                        <Undo size={12} />
+                      </button>
+
+                      {/* Redo Button */}
+                      <button
+                        type="button"
+                        onClick={handleRedo}
+                        disabled={historyIndex >= textHistory.length - 1}
+                        className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
+                          historyIndex < textHistory.length - 1 ? 'bg-white border-gray-200 hover:bg-gray-50 text-slate-700' : 'bg-slate-50 border-slate-100 text-gray-300'
+                        }`}
+                        title="Шаг вперед (Redo)"
+                      >
+                        <Redo size={12} />
+                      </button>
+
+                      {/* More Menu */}
+                      <button
+                        type="button"
+                        onClick={() => setActiveDropdown(activeDropdown === 'more' ? null : 'more')}
+                        className={`p-1.5 border rounded-lg transition-all flex items-center justify-center cursor-pointer ${
+                          activeDropdown === 'more' ? 'bg-slate-100 border-gray-300 text-slate-800' : 'bg-white border-gray-200 text-slate-500 hover:bg-slate-50'
+                        }`}
+                        title="Управление оформлением"
+                      >
+                        <MoreHorizontal size={12} />
+                      </button>
+
+                      {/* More settings absolute pop */}
+                      {activeDropdown === 'more' && (
+                        <div className="absolute top-[110%] right-0 z-50 w-60 bg-white border border-gray-200 rounded-xl shadow-xl p-3 animate-in fade-in duration-100 text-slate-700">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Настройки листа</span>
+                          <div className="flex flex-col gap-2">
+                            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold">
+                              <input
+                                type="checkbox"
+                                checked={config.showMargins}
+                                onChange={(e) => setConfig({ ...config, showMargins: e.target.checked })}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span>Показывать красные поля</span>
+                            </label>
+
+                            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold">
+                              <input
+                                type="checkbox"
+                                checked={config.curvedLines}
+                                onChange={(e) => setConfig({ ...config, curvedLines: e.target.checked })}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span>Реалистичное искривление</span>
+                            </label>
+
+                            <label className="flex items-center gap-2 cursor-pointer text-xs font-bold">
+                              <input
+                                type="checkbox"
+                                checked={showSignature}
+                                onChange={(e) => setShowSignature(e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span>Приложить подпись</span>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Main editing area with relative clean floating actions */}
+                  <div className="relative flex-1 bg-white flex flex-col min-h-[300px]">
+                    <textarea
+                      value={textInput}
+                      onChange={(e) => handleTextareaChange(e.target.value)}
+                      onBlur={() => {
+                        // Save to history on blur to keep stack synchronized
+                        if (textInput !== textHistory[historyIndex]) {
+                          updateTextAndHistory(textInput);
+                        }
+                      }}
+                      rows={14}
+                      className="w-full flex-1 resize-none bg-white font-sans text-xs font-medium text-slate-800 leading-relaxed p-5 outline-none placeholder-gray-400 border-none select-text"
+                      placeholder="Введите ваши конспекты, абзацы, таблицы или LaTeX формулы..."
+                    />
+
+                    {/* Tiny visual notebook line grid indicator on background to reinforce handdrawn look */}
+                    <div className="absolute right-3.5 top-3.5 flex items-center gap-1 p-1 bg-slate-50 border border-slate-100/90 rounded-md shadow-xs select-none pointer-events-none">
+                      <span className="w-2.5 h-2.5 rounded-full border border-black/10" style={{ backgroundColor: {
+                        blue: '#1d3f94',
+                        black: '#17171a',
+                        red: '#c91818',
+                        purple: '#5c2090',
+                        green: '#14612d',
+                        brown: '#7a431d',
+                      }[config.inkColor] || config.inkColor }} />
+                      <span className="text-[9px] font-bold text-slate-400 font-mono uppercase">
+                        {config.penStyle === 'gel' ? 'Гелевая' : 'Карандаш'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Math Injection Quick Widgets */}
+                  <div className="p-4 border-t border-gray-100/70 bg-slate-50/40">
                     <span className="text-[10px] uppercase font-bold text-gray-400 block mb-2 tracking-wider flex items-center gap-1">
                       <Sigma size={11} className="text-blue-500" />
-                      Вставить математический шаблон
+                      Быстрый математический шаблон LaTeX
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       <button
                         onClick={() => insertLaTeXTemplate('\\frac{\\alpha + \\beta}{x^2}')}
-                        className="bg-gray-50 border border-gray-200 hover:border-blue-500 text-[10.5px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                        className="bg-white border border-gray-200 hover:border-blue-500 text-[10.5px] font-bold px-2.5 py-1 rounded-md transition-all cursor-pointer shadow-2xs"
                       >
                         Дробь
                       </button>
                       <button
                         onClick={() => insertLaTeXTemplate('\\int_{a}^{b} x^2 dx')}
-                        className="bg-gray-50 border border-gray-200 hover:border-blue-500 text-[10.5px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                        className="bg-white border border-gray-200 hover:border-blue-500 text-[10.5px] font-bold px-2.5 py-1 rounded-md transition-all cursor-pointer shadow-2xs"
                       >
                         Интеграл с пределами
                       </button>
                       <button
                         onClick={() => insertLaTeXTemplate('\\sqrt{a^2 + b^2}')}
-                        className="bg-gray-50 border border-gray-200 hover:border-blue-500 text-[10.5px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                        className="bg-white border border-gray-200 hover:border-blue-500 text-[10.5px] font-bold px-2.5 py-1 rounded-md transition-all cursor-pointer shadow-2xs"
                       >
                         Квадратный корень
                       </button>
                       <button
                         onClick={() => insertLaTeXTemplate('\\sum_{k=1}^{n} k')}
-                        className="bg-gray-50 border border-gray-200 hover:border-blue-500 text-[10.5px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer"
+                        className="bg-white border border-gray-200 hover:border-blue-500 text-[10.5px] font-bold px-2.5 py-1 rounded-md transition-all cursor-pointer shadow-2xs"
                       >
                         Сумма
                       </button>
                       <button
                         onClick={() => insertLaTeXTemplate('\\frac{\\frac{a + b}{c}}{\\frac{d}{e}}')}
-                        className="bg-gray-50 border border-gray-200 hover:border-blue-500 text-[10.5px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer text-blue-600"
+                        className="bg-white border border-gray-200 hover:border-blue-500 text-[10.5px] font-bold px-2.5 py-1 rounded-md transition-all cursor-pointer text-blue-600 shadow-2xs font-semibold"
                         title="Трехэтажная дробь"
                       >
-                        3-этажная дробь
-                      </button>
-                      <button
-                        onClick={() => insertLaTeXTemplate('\\frac{\\frac{\\frac{a}{b}}{c}}{\\frac{d}{e}}')}
-                        className="bg-gray-50 border border-gray-200 hover:border-blue-500 text-[10.5px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer text-purple-600"
-                        title="Четырехэтажная дробь"
-                      >
-                        4-этажная дробь
-                      </button>
-                      <button
-                        onClick={() => insertLaTeXTemplate('\\sqrt[99999]{x^2 + y^2 + \\frac{\\alpha}{\\beta}}')}
-                        className="bg-gray-50 border border-gray-200 hover:border-blue-500 text-[10.5px] font-semibold px-2.5 py-1 rounded-md transition-all cursor-pointer text-emerald-600"
-                        title="Корень 99999 степени"
-                      >
-                        Корень 99999 ст.
+                        3-этажная
                       </button>
                     </div>
                   </div>
 
-                  {/* Table Templates */}
-                  <div className="mt-4 pt-3 border-t border-gray-100">
-                    <span className="text-[10px] uppercase font-bold text-gray-400 block mb-2 tracking-wider flex items-center gap-1">
-                      <Table2 size={11} className="text-purple-600" />
-                      Вставить рукописную таблицу
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button
-                        onClick={() => insertTableTemplate('ruler')}
-                        className="bg-purple-50 hover:bg-purple-100 border border-purple-200 hover:border-purple-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-purple-700 transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <span>📏 Нарисовать по линейке</span>
-                      </button>
-                      <button
-                        onClick={() => insertTableTemplate('handdrawn')}
-                        className="bg-orange-50 hover:bg-orange-100 border border-orange-200 hover:border-orange-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-orange-700 transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <span>✍️ Слегка неровно от руки</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Print & Form Field Templates */}
-                  <div className="mt-4 pt-3 border-t border-gray-100">
+                  {/* Printed & Form Layout Section */}
+                  <div className="p-4 border-t border-gray-100 bg-slate-50/20">
                     <span className="text-[10px] uppercase font-bold text-gray-400 block mb-2 tracking-wider flex items-center gap-1">
                       <Settings2 size={11} className="text-emerald-600" />
                       Печатная разметка и Бланки
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       <button
-                        onClick={() => insertTableTemplate('printed')}
-                        className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-emerald-700 transition-all cursor-pointer flex items-center gap-1"
-                      >
-                        <span>🖨️ Печатная таблица</span>
-                      </button>
-                      <button
                         onClick={() => {
-                          setTextInput(prev => prev + `\n[line:200:ФИО] [style:neat-school]Иванов Иван Иванович[/style] [/line]\n[line:100:Дата] [style:neat-school]25.05.2026[/style] [/line] [line:100:Подпись]             [/line]`);
+                          updateTextAndHistory(textInput + `\n[line:200:ФИО] [style:neat-school]Иванов Иван Иванович[/style] [/line]\n[line:100:Дата] [style:neat-school]25.05.2026[/style] [/line] [line:100:Подпись]             [/line]`);
                         }}
-                        className="bg-teal-50 hover:bg-teal-100 border border-teal-200 hover:border-teal-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-teal-700 transition-all cursor-pointer flex items-center gap-1"
+                        className="bg-teal-50 hover:bg-teal-100 border border-teal-150 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-teal-700 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                       >
                         <span>➖ Строка бланка (ФИО, Дата)</span>
                       </button>
                       <button
                         onClick={() => {
-                          setTextInput(prev => prev + `\n[print]Печатный текст Serif (Times New Roman)[/print]`);
+                          updateTextAndHistory(textInput + `\n[print]Печатный текст Serif (Times New Roman)[/print]`);
                         }}
-                        className="bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-gray-700 transition-all cursor-pointer flex items-center gap-1"
+                        className="bg-white hover:bg-gray-50 border border-gray-200 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-gray-700 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                       >
                         <span>📜 Печатный Serif</span>
                       </button>
                       <button
                         onClick={() => {
-                          setTextInput(prev => prev + `\n[print:sans]Печатный текст Sans (Inter/Arial)[/print]`);
+                          updateTextAndHistory(textInput + `\n[print:sans]Печатный текст Sans (Inter/Arial)[/print]`);
                         }}
-                        className="bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-gray-700 transition-all cursor-pointer flex items-center gap-1"
+                        className="bg-white hover:bg-gray-50 border border-gray-200 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-gray-700 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                       >
                         <span>📄 Печатный Sans</span>
                       </button>
                       <button
                         onClick={() => {
-                          setTextInput(prev => prev + `\n[print:mono]Печатная машинка (Courier)[/print]`);
+                          updateTextAndHistory(textInput + `\n[print:mono]Печатная машинка (Courier)[/print]`);
                         }}
-                        className="bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-gray-700 transition-all cursor-pointer flex items-center gap-1"
+                        className="bg-white hover:bg-gray-50 border border-gray-200 text-[10.5px] font-bold px-2.5 py-1 rounded-md text-gray-700 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
                       >
                         <span>📟 Машинка (Mono)</span>
                       </button>
@@ -2251,6 +2789,23 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
 
                     <div>
                       <div className="flex justify-between items-center text-[11px] font-semibold text-gray-400 mb-1">
+                        <span>ЯРКОСТЬ СЕТКИ И ПОЛЕЙ (БЛИК)</span>
+                        <span className="text-gray-700">{Math.round((config.linesOpacity !== undefined ? config.linesOpacity : 0.12) * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="0.5"
+                        step="0.02"
+                        value={config.linesOpacity !== undefined ? config.linesOpacity : 0.12}
+                        onChange={(e) => setConfig({ ...config, linesOpacity: parseFloat(e.target.value) })}
+                        className="w-full h-1 bg-gray-100 rounded-lg appearance-none accent-blue-600 cursor-pointer"
+                        title="Регулировка видимости вспомогательных линий листа"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center text-[11px] font-semibold text-gray-400 mb-1">
                         <span>{getToolThicknessMeta(config.inkColor, config.toolType)?.label || 'ТОЛЩИНА ПЕРА (ЛИНИИ)'}</span>
                         <span className="text-gray-700 font-bold">{config.strokeThickness.toFixed(1)}px</span>
                       </div>
@@ -2420,7 +2975,7 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
               </div>
 
               {/* Right Column Canvas Preview */}
-              <div className="lg:col-span-7 flex flex-col gap-4">
+              <div className="lg:col-span-6 flex flex-col gap-4">
                 <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
                   <span className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-4">
                     Реалистичный предпросмотр документа
@@ -2495,6 +3050,356 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
           )}
         </AnimatePresence>
       </main>
+
+      {/* Fullscreen Side-by-Side Editor Overlay */}
+      <AnimatePresence>
+        {isFullscreen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[99995] bg-slate-900 flex flex-col text-slate-100 font-sans"
+            id="fullscreen-pro-editor"
+          >
+            {/* Fullscreen Header */}
+            <div className="bg-slate-950 border-b border-slate-800 px-6 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">✍️</span>
+                <div>
+                  <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">Полноэкранный режим редактора</h2>
+                  <p className="text-xs text-slate-500 font-bold font-sans">TypeScribe AI — Умный интерактивный симулятор почерка</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsFullscreen(false);
+                  setActiveDropdown(null);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-extrabold text-[11px] transition-all scroll-smooth cursor-pointer leading-none shadow-md shadow-red-900/10"
+              >
+                <Minimize2 size={12} />
+                <span>Выйти из редактора</span>
+              </button>
+            </div>
+
+            {/* Split Screen Layout */}
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+              {/* Left Column: Editor & Toolbars */}
+              <div className="lg:col-span-6 bg-slate-800 flex flex-col h-full overflow-hidden border-r border-slate-900 relative">
+                {activeDropdown && (
+                  <div 
+                    className="fixed inset-0 z-40 bg-transparent cursor-default" 
+                    onClick={() => setActiveDropdown(null)} 
+                  />
+                )}
+                {/* Rich Word-Style Toolbar Embedded inside Fullscreen */}
+                <div className="bg-slate-900 border-b border-slate-950 p-3.5 flex flex-wrap gap-1.5 items-center select-none text-slate-300">
+                  {/* 1. Color Dropdown */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setActiveDropdown(activeDropdown === 'fs-color' ? null : 'fs-color')}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                        activeDropdown === 'fs-color' ? 'bg-slate-800 border-blue-500 text-blue-400 shadow-xs' : 'bg-slate-850 border-slate-700 hover:bg-slate-750'
+                      }`}
+                      title="Цвет чернил"
+                    >
+                      <span className="font-extrabold text-sm relative border-b-3 px-0.5 leading-none transition-all" style={{ borderBottomColor: config.inkColor }}>
+                        А
+                      </span>
+                      <ChevronDown size={10} className="text-slate-400" />
+                    </button>
+                    {activeDropdown === 'fs-color' && (
+                      <div className="absolute top-[110%] left-0 z-[100] w-52 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-2 animate-in fade-in duration-100 text-slate-100">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1 px-1">Цвет ручки</span>
+                        <div className="grid grid-cols-2 gap-1">
+                          {[
+                            { id: 'blue', name: 'Синий', hex: '#1d3f94' },
+                            { id: 'black', name: 'Черный', hex: '#17171a' },
+                            { id: 'red', name: 'Красный', hex: '#c91818' },
+                            { id: 'purple', name: 'Фиолет', hex: '#5c2090' },
+                            { id: 'green', name: 'Зеленый', hex: '#14612d' },
+                            { id: 'brown', name: 'Корич.', hex: '#7a431d' },
+                          ].map((c) => (
+                            <button
+                              key={c.id}
+                              onClick={() => {
+                                setConfig({ ...config, inkColor: c.id });
+                                setActiveDropdown(null);
+                              }}
+                              className="flex items-center gap-1.5 p-1 rounded-md hover:bg-slate-800 text-[11px] font-semibold text-slate-300 cursor-pointer"
+                            >
+                              <span className="w-3.5 h-3.5 rounded-full border border-black/10 flex-shrink-0" style={{ backgroundColor: c.hex }} />
+                              <span className="truncate">{c.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Image/Drawing */}
+                  <button
+                    type="button"
+                    onClick={() => insertDrawingIntoText()}
+                    className="p-1 px-1.5 bg-slate-850 hover:bg-slate-750 border border-slate-700 rounded-lg text-slate-300 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                    title="Вставить текущий рисунок"
+                  >
+                    <ImageIcon size={14} className="text-emerald-400" />
+                  </button>
+
+                  {/* Table templates */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setActiveDropdown(activeDropdown === 'fs-table' ? null : 'fs-table')}
+                      className={`flex items-center gap-1 px-1.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                        activeDropdown === 'fs-table' ? 'bg-slate-800 border-blue-500 text-blue-400' : 'bg-slate-850 border-slate-700 hover:bg-slate-755'
+                      }`}
+                      title="Вставить таблицу"
+                    >
+                      <Table2 size={14} className="text-purple-400" />
+                      <ChevronDown size={10} className="text-slate-400" />
+                    </button>
+                    {activeDropdown === 'fs-table' && (
+                      <div className="absolute top-[110%] left-0 z-50 w-56 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-2 animate-in fade-in duration-100 text-slate-200">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1.5 px-1">Шаблоны таблиц</span>
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => {
+                              insertTableTemplate('ruler');
+                              setActiveDropdown(null);
+                            }}
+                            className="w-full text-left p-1.5 rounded-lg hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+                          >
+                            📏 Нарисовать по линейке
+                          </button>
+                          <button
+                            onClick={() => {
+                              insertTableTemplate('handdrawn');
+                              setActiveDropdown(null);
+                            }}
+                            className="w-full text-left p-1.5 rounded-lg hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+                          >
+                            ✍️ Слега неровно от руки
+                          </button>
+                          <button
+                            onClick={() => {
+                              insertTableTemplate('printed');
+                              setActiveDropdown(null);
+                            }}
+                            className="w-full text-left p-1.5 rounded-lg hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer"
+                          >
+                            🖨️ Печатная таблица
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Шрифт Selection */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setActiveDropdown(activeDropdown === 'fs-font' ? null : 'fs-font')}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                        activeDropdown === 'fs-font' ? 'bg-slate-800 border-blue-500 text-blue-400 shadow-xs' : 'bg-slate-850 border-slate-700 hover:bg-slate-750'
+                      }`}
+                      title="Выбрать почерк"
+                    >
+                      <span className="max-w-[100px] truncate text-[11px]">
+                        {activeStyle ? activeStyle.name : 'по умолчанию'}
+                      </span>
+                      <ChevronDown size={10} className="text-slate-400 flex-shrink-0" />
+                    </button>
+                    {activeDropdown === 'fs-font' && (
+                      <div className="absolute top-[110%] left-0 z-[100] w-56 max-h-64 overflow-y-auto bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-2 animate-in fade-in duration-100 text-slate-100">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1 px-1">Выбрать почерк</span>
+                        <div className="flex flex-col gap-0.5">
+                          {styles.map((s) => (
+                            <button
+                              key={s.id}
+                              onClick={() => {
+                                setSelectedStyleId(s.id);
+                                setActiveDropdown(null);
+                              }}
+                              className={`w-full text-left p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex justify-between items-center ${
+                                s.id === selectedStyleId ? 'bg-blue-900/40 text-blue-400 font-extrabold' : 'hover:bg-slate-800 text-slate-300'
+                              }`}
+                            >
+                              <span className="truncate">{s.name}</span>
+                              {s.id === selectedStyleId && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Размер буквы - Font Size */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setActiveDropdown(activeDropdown === 'fs-size' ? null : 'fs-size')}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                        activeDropdown === 'fs-size' ? 'bg-slate-800 border-blue-500 text-blue-400 shadow-xs' : 'bg-slate-850 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      <span className="text-[11px]">{fontSize}px</span>
+                      <ChevronDown size={10} className="text-slate-400" />
+                    </button>
+                    {activeDropdown === 'fs-size' && (
+                      <div className="absolute top-[110%] left-0 z-50 w-28 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-1.5 animate-in fade-in duration-100 text-slate-200">
+                        {[16, 18, 20, 22, 24, 26, 28, 30, 32, 36].map((sz) => (
+                          <button
+                            key={sz}
+                            onClick={() => {
+                              setFontSize(sz);
+                              setActiveDropdown(null);
+                            }}
+                            className={`w-full text-left p-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                              sz === fontSize ? 'bg-blue-950 text-blue-400 font-extrabold' : 'hover:bg-slate-800 text-slate-300'
+                            }`}
+                          >
+                            {sz}px
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Формат листа (lined, squared, blank) */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setActiveDropdown(activeDropdown === 'fs-format' ? null : 'fs-format')}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                        activeDropdown === 'fs-format' ? 'bg-slate-800 border-blue-500 text-blue-400' : 'bg-slate-850 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      <span className="text-[11px]">
+                        {config.paperType === 'lined' ? 'Линейка' : config.paperType === 'squared' ? 'Клетка' : 'Чистый'}
+                      </span>
+                      <ChevronDown size={10} className="text-slate-400" />
+                    </button>
+                    {activeDropdown === 'fs-format' && (
+                      <div className="absolute top-[110%] left-0 z-50 w-36 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-1.5 animate-in fade-in duration-100 text-slate-200">
+                        {[
+                          { id: 'lined', label: '✍️ Линейка' },
+                          { id: 'squared', label: '🎚️ Клетка' },
+                          { id: 'blank', label: '📄 Чистый лист' },
+                        ].map((f) => (
+                          <button
+                            key={f.id}
+                            onClick={() => {
+                              setConfig({ ...config, paperType: f.id as any });
+                              setActiveDropdown(null);
+                            }}
+                            className={`w-full text-left p-1.5 rounded-md text-xs font-semibold cursor-pointer ${
+                              f.id === config.paperType ? 'bg-blue-950 text-blue-400 font-extrabold' : 'hover:bg-slate-800 text-slate-300'
+                            }`}
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Undo, Redo, Clear */}
+                  <span className="text-slate-700">|</span>
+
+                  <button
+                    onClick={handleUndo}
+                    disabled={historyIndex <= 0}
+                    className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
+                      historyIndex > 0 ? 'bg-slate-850 border-slate-700 hover:bg-slate-750 text-slate-100' : 'bg-slate-900 border-slate-800 text-slate-600'
+                    }`}
+                  >
+                    <Undo size={12} />
+                  </button>
+
+                  <button
+                    onClick={handleRedo}
+                    disabled={historyIndex >= textHistory.length - 1}
+                    className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center justify-center ${
+                      historyIndex < textHistory.length - 1 ? 'bg-slate-850 border-slate-700 hover:bg-slate-750 text-slate-100' : 'bg-slate-900 border-slate-800 text-slate-600'
+                    }`}
+                  >
+                    <Redo size={12} />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (confirm('Очистить поле редактирования?')) {
+                        updateTextAndHistory('');
+                      }
+                    }}
+                    className="p-1.5 rounded-lg bg-slate-850 border border-slate-700 hover:border-red-500/40 hover:bg-red-950/20 text-slate-400 hover:text-red-400 cursor-pointer"
+                    title="Очистить текст"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+
+                  {/* Eraser Formatting Stripper */}
+                  <button
+                    onClick={() => {
+                      const cleanText = textInput
+                        .replace(/\[\/?style.*?\]/g, '')
+                        .replace(/\[\/?print.*?\]/g, '')
+                        .replace(/\[\/?line.*?\]/g, '')
+                        .replace(/\[drawing:.*?\]/g, '');
+                      updateTextAndHistory(cleanText);
+                    }}
+                    className="p-1.5 rounded-lg bg-slate-850 border border-slate-700 hover:border-amber-500/40 hover:bg-amber-950/20 text-slate-400 hover:text-amber-400 cursor-pointer flex items-center justify-center"
+                    title="Стереть все теги"
+                  >
+                    <Eraser size={12} />
+                  </button>
+                </div>
+
+                {/* Sub-toolbar widgets */}
+                <div className="bg-slate-850 p-2.5 px-4 border-b border-slate-900 flex justify-between items-center text-xs text-slate-400">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAISummarize}
+                      disabled={isTranslating}
+                      className="px-2 py-1 rounded bg-purple-950/40 border border-purple-800 text-purple-300 font-bold hover:bg-purple-900/50 cursor-pointer flex items-center gap-1 text-[10.5px]"
+                    >
+                      <Sparkles size={11} />
+                      <span>{isTranslating ? 'Поджержка AI...' : 'Улучшить с AI'}</span>
+                    </button>
+                  </div>
+                  <span className="font-mono text-[10px] uppercase font-black tracking-widest text-slate-500">
+                    Строк: {textInput.split('\n').length} | Символов: {textInput.length}
+                  </span>
+                </div>
+
+                {/* Fullscreen Relative Textarea */}
+                <div className="flex-1 relative flex flex-col bg-slate-950">
+                  <textarea
+                    value={textInput}
+                    onChange={(e) => handleTextareaChange(e.target.value)}
+                    onBlur={() => {
+                      if (textInput !== textHistory[historyIndex]) {
+                        updateTextAndHistory(textInput);
+                      }
+                    }}
+                    className="w-full flex-1 resize-none bg-slate-950 font-mono text-xs font-medium text-slate-200 leading-relaxed p-6 outline-none border-none select-text"
+                    placeholder="Введите текст конспекта..."
+                  />
+
+                  {/* Render the full high fidelity sheet */}
+                  <div className="flex justify-center w-full transform scale-95 origin-top transition-transform">
+                    <A4Paper pages={renderedPages} config={config} fontSize={fontSize} style={activeStyle} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Font Details Info Modal Dynamic Overlay */}
       {fontsInfoModal && (
