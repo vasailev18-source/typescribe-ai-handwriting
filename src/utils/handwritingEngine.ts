@@ -1,4 +1,4 @@
-import { PageConfig, HandwritingStyle, Drawing } from '../types';
+import { PageConfig, HandwritingStyle, Drawing, PageSize } from '../types';
 
 // Let's create a procedural representation of strokes for characters.
 // Each character is defined as a series of strokes (array of coordinate points [x, y] on a 0-100 grid).
@@ -1583,11 +1583,26 @@ export interface RenderedPage {
   }>;
 }
 
-// Computes wrapped lines based on width margins of A4
-// Standard A4 dimensions in pixels at 72 PPI are 595 x 842.
-// We use A4 standard 794 x 1123 pixels (matching high quality print aspect ratio)
+// Computes wrapped lines based on width margins of any paper standard size
+// Standard dimensions at high printed-like layout aspect ratios:
 export const PAGE_WIDTH = 794;
 export const PAGE_HEIGHT = 1123;
+
+export function getPageDimensions(pageSize?: PageSize): { width: number; height: number } {
+  switch (pageSize) {
+    case 'A5':
+      return { width: 559, height: 794 };
+    case 'A6':
+      return { width: 397, height: 559 };
+    case 'letter':
+      return { width: 816, height: 1056 };
+    case 'notebook':
+      return { width: 620, height: 800 };
+    case 'A4':
+    default:
+      return { width: 794, height: 1123 };
+  }
+}
 
 export function wrapTextIntoPages(
   text: string,
@@ -1597,6 +1612,7 @@ export function wrapTextIntoPages(
   availableStyles: HandwritingStyle[] = [],
   drawings?: Record<string, Drawing>
 ): Array<RenderedPage> {
+  const { width: PAGE_WIDTH, height: PAGE_HEIGHT } = getPageDimensions(config.pageSize);
   const processedText = preprocessUserTextMath(text);
   const pages: Array<RenderedPage> = [];
   const lines = processedText.split('\n');

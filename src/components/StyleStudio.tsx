@@ -27,10 +27,550 @@ import {
   FileText, 
   LayoutGrid,
   Edit2,
-  Copy
+  Copy,
+  Cpu
 } from 'lucide-react';
 import { parseSVGPathToStrokes, BASE_GLYPHS } from '../utils/handwritingEngine';
 import { motion, AnimatePresence } from 'motion/react';
+
+function perform2DSegmentation(
+  img: HTMLImageElement,
+  thresh: number,
+  sequence: string
+): Array<{ id: number; char: string; croppedDataUrl: string; pathData: string; rect: { x: number; y: number; w: number; h: number } }> {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return [];
+
+  const maxDim = 1200;
+  let w = img.width;
+  let h = img.height;
+  if (w > maxDim || h > maxDim) {
+    if (w > h) {
+      h = Math.round((h * maxDim) / w);
+      w = maxDim;
+    } else {
+      w = Math.round((w * maxDim) / h);
+      h = maxDim;
+    }
+  }
+  canvas.width = w;
+  canvas.height = h;
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const data = imgData.data;
+
+  // 1. Create original binary map of dark vs light pixels
+  const binary = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) {
+    const idx = i * 4;
+    const brightness = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+    binary[i] = brightness < thresh ? 1 : 0;
+  }
+
+  // 2. Suppress and erase grid lines (horizontal and vertical line runs)
+  const minHorizRun = Math.round(w * 0.14); // Safer threshold
+  const minVertRun = Math.round(h * 0.14);  // Safer threshold
+  const toErase = new Uint8Array(w * h);
+
+  // Mark long horizontal lines/ruling lines
+  for (let y = 0; y < h; y++) {
+    let runStart = -1;
+    for (let x = 0; x < w; x++) {
+      if (binary[y * w + x] === 1) {
+        if (runStart === -1) runStart = x;
+      } else {
+        if (runStart !== -1) {
+          if (x - runStart >= minHorizRun) {
+            for (let rx = runStart; rx < x; rx++) {
+              toErase[y * w + rx] = 1;
+            }
+          }
+          runStart = -1;
+        }
+      }
+    }
+    if (runStart !== -1 && w - runStart >= minHorizRun) {
+      for (let rx = runStart; rx < w; rx++) {
+        toErase[y * w + rx] = 1;
+      }
+    }
+  }
+
+  // Mark long vertical lines/column markings
+  for (let x = 0; x < w; x++) {
+    let runStart = -1;
+    for (let y = 0; y < h; y++) {
+      if (binary[y * w + x] === 1) {
+        if (runStart === -1) runStart = y;
+      } else {
+        if (runStart !== -1) {
+          if (y - runStart >= minVertRun) {
+            for (let ry = runStart; ry < y; ry++) {
+              toErase[ry * w + x] = 1;
+            }
+          }
+          runStart = -1;
+        }
+      }
+    }
+    if (runStart !== -1 && h - runStart >= minVertRun) {
+      for (let ry = runStart; ry < h; ry++) {
+        toErase[ry * w + x] = 1;
+      }
+    }
+  }
+
+  // Draw white pixels on the canvas where the grid was, to avoid including them in visual crops
+  for (let i = 0; i < w * h; i++) {
+    if (toErase[i] === 1) {
+      data[i * 4] = 255;
+      data[i * 4 + 1] = 255;
+      data[i * 4 + 2] = 255;
+      binary[i] = 0; // Remove from active ink tracking
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // 3. Extract connected ink components (8-connectivity BFS)
+  interface RawBlob {
+    id: number;
+    xMin: number;
+    xMax: number;
+    yMin: number;
+    yMax: number;
+    pixelCount: number;
+  }
+
+  const visited = new Uint8Array(w * h);
+  const rawBlobs: RawBlob[] = [];
+  let blobCounter = 0;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = y * w + x;
+      if (binary[idx] === 1 && visited[idx] === 0) {
+        // Find full component
+        const queue: number[] = [idx];
+        visited[idx] = 1;
+
+        let xMin = x;
+        let xMax = x;
+        let yMin = y;
+        let yMax = y;
+        let pCount = 0;
+
+        let qIdx = 0;
+        while (qIdx < queue.length) {
+          const curr = queue[qIdx++];
+          const cy = Math.floor(curr / w);
+          const cx = curr % w;
+          pCount++;
+
+          if (cx < xMin) xMin = cx;
+          if (cx > xMax) xMax = cx;
+          if (cy < yMin) yMin = cy;
+          if (cy > yMax) yMax = cy;
+
+          // 8 close neighbours
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              const nx = cx + dx;
+              const ny = cy + dy;
+              if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+                const nidx = ny * w + nx;
+                if (binary[nidx] === 1 && visited[nidx] === 0) {
+                  visited[nidx] = 1;
+                  queue.push(nidx);
+                }
+              }
+            }
+          }
+        }
+
+        rawBlobs.push({
+          id: blobCounter++,
+          xMin,
+          xMax,
+          yMin,
+          yMax,
+          pixelCount: pCount
+        });
+      }
+    }
+  }
+
+  // 4. Filter noise & massive borders/margins
+  const validBlobs = rawBlobs.filter(blob => {
+    const bw = blob.xMax - blob.xMin + 1;
+    const bh = blob.yMax - blob.yMin + 1;
+
+    // Filter out huge borders or leftovers
+    if (bw > w * 0.14 || bh > h * 0.14) return false;
+    // Filter out tiny dust particles
+    if (bw < 3 && bh < 3 && blob.pixelCount < 6) return false;
+    return true;
+  });
+
+  // 5. Smart iterative merging of accents and compound characters (ё, й, ы, ъ)
+  interface Segment {
+    id: number;
+    xMin: number;
+    xMax: number;
+    yMin: number;
+    yMax: number;
+  }
+
+  let segmentsList: Segment[] = validBlobs.map((b, idx) => ({
+    id: idx,
+    xMin: b.xMin,
+    xMax: b.xMax,
+    yMin: b.yMin,
+    yMax: b.yMax
+  }));
+
+  let mergedAny = true;
+  while (mergedAny) {
+    mergedAny = false;
+    for (let i = 0; i < segmentsList.length; i++) {
+      for (let j = i + 1; j < segmentsList.length; j++) {
+        const s1 = segmentsList[i];
+        const s2 = segmentsList[j];
+
+        const s1H = s1.yMax - s1.yMin + 1;
+        const s2H = s2.yMax - s2.yMin + 1;
+
+        // 1. Vertical overlap check (strictly for dots on Ё/ё, Й/й, breves, accents)
+        const xOverlap = Math.max(s1.xMin, s2.xMin) <= Math.min(s1.xMax, s2.xMax) + Math.round(w * 0.012);
+        const yDist = Math.max(s1.yMin, s2.yMin) - Math.min(s1.yMax, s2.yMax);
+
+        // One of them is likely a diacritic/accent mark if it's very small compared to the other or overall height
+        const isDiacritic = Math.min(s1H, s2H) < Math.max(12, Math.round(h * 0.025)) || Math.min(s1H, s2H) < Math.max(s1H, s2H) * 0.35;
+
+        // Only merge vertically if they are extremely close or one is a genuine small diacritic above the letter
+        const isVerticalPair = xOverlap && (
+          (yDist < Math.max(6, Math.round(h * 0.015))) || // very tight spacing
+          (isDiacritic && yDist < Math.round(h * 0.05)) // diacritic mark above letter
+        );
+
+        // 2. Close horizontal proximity check (strictly for composite letters like ы, Ы, ъ)
+        const yOverlap = Math.max(s1.yMin, s2.yMin) <= Math.min(s1.yMax, s2.yMax) + Math.round(h * 0.015);
+        const xDist = Math.max(s1.xMin, s2.xMin) - Math.min(s1.xMax, s2.xMax);
+        const isHorizontalPair = yOverlap && xDist < Math.round(w * 0.015);
+
+        if (isVerticalPair || isHorizontalPair) {
+          s1.xMin = Math.min(s1.xMin, s2.xMin);
+          s1.xMax = Math.max(s1.xMax, s2.xMax);
+          s1.yMin = Math.min(s1.yMin, s2.yMin);
+          s1.yMax = Math.max(s1.yMax, s2.yMax);
+
+          segmentsList.splice(j, 1);
+          mergedAny = true;
+          break;
+        }
+      }
+      if (mergedAny) break;
+    }
+  }
+
+  // 5.5. RECURSIVE PROJECTION SPLITTING
+  // Perfect for separating uppercase and lowercase letters written in the same box ("Аа"),
+  // or stacked rows ("А" and "Ж") that were captured in a single component!
+  function shrinkToBounds(s: Segment): Segment | null {
+    let sXMin = s.xMax;
+    let sXMax = s.xMin;
+    let sYMin = s.yMax;
+    let sYMax = s.yMin;
+    let hasInk = false;
+
+    for (let y = s.yMin; y <= s.yMax; y++) {
+      for (let x = s.xMin; x <= s.xMax; x++) {
+        if (binary[y * w + x] === 1) {
+          hasInk = true;
+          if (x < sXMin) sXMin = x;
+          if (x > sXMax) sXMax = x;
+          if (y < sYMin) sYMin = y;
+          if (y > sYMax) sYMax = y;
+        }
+      }
+    }
+
+    if (!hasInk) return null;
+    return { id: s.id, xMin: sXMin, xMax: sXMax, yMin: sYMin, yMax: sYMax };
+  }
+
+  function splitSegmentRecursive(seg: Segment, depth = 0): Segment[] {
+    if (depth > 6) return [seg];
+
+    const segW = seg.xMax - seg.xMin + 1;
+    const segH = seg.yMax - seg.yMin + 1;
+
+    if (segW < 14 || segH < 14) {
+      return [seg];
+    }
+
+    // Compute projections within the segment bounds
+    const rowSums = new Int32Array(segH);
+    const colSums = new Int32Array(segW);
+
+    for (let sy = 0; sy < segH; sy++) {
+      const y = seg.yMin + sy;
+      for (let sx = 0; sx < segW; sx++) {
+        const x = seg.xMin + sx;
+        if (binary[y * w + x] === 1) {
+          rowSums[sy]++;
+          colSums[sx]++;
+        }
+      }
+    }
+
+    // A. Check for stacked characters (horizontal split)
+    const hMargin = Math.max(4, Math.round(segH * 0.16));
+    let bestSplitY = -1;
+    let minRowSum = Infinity;
+
+    for (let sy = hMargin; sy < segH - hMargin; sy++) {
+      if (rowSums[sy] < minRowSum) {
+        minRowSum = rowSums[sy];
+        bestSplitY = sy;
+      } else if (rowSums[sy] === minRowSum && Math.abs(sy - segH / 2) < Math.abs(bestSplitY - segH / 2)) {
+        bestSplitY = sy;
+      }
+    }
+
+    // Split if there is a distinct horizon with low ink density (e.g., separate text line split)
+    const maxRowSumThresh = Math.max(1, Math.round(segW * 0.035));
+    if (bestSplitY !== -1 && minRowSum <= maxRowSumThresh) {
+      const s1: Segment = { id: seg.id * 10 + 1, xMin: seg.xMin, xMax: seg.xMax, yMin: seg.yMin, yMax: seg.yMin + bestSplitY - 1 };
+      const s2: Segment = { id: seg.id * 10 + 2, xMin: seg.xMin, xMax: seg.xMax, yMin: seg.yMin + bestSplitY + 1, yMax: seg.yMax };
+
+      const s1s = shrinkToBounds(s1);
+      const s2s = shrinkToBounds(s2);
+
+      const res: Segment[] = [];
+      if (s1s) res.push(...splitSegmentRecursive(s1s, depth + 1));
+      if (s2s) res.push(...splitSegmentRecursive(s2s, depth + 1));
+      return res;
+    }
+
+    // B. Check for side-by-side characters (vertical split)
+    const wMargin = Math.max(4, Math.round(segW * 0.16));
+    let bestSplitX = -1;
+    let minColSum = Infinity;
+
+    for (let sx = wMargin; sx < segW - wMargin; sx++) {
+      if (colSums[sx] < minColSum) {
+        minColSum = colSums[sx];
+        bestSplitX = sx;
+      } else if (colSums[sx] === minColSum && Math.abs(sx - segW / 2) < Math.abs(bestSplitX - segW / 2)) {
+        bestSplitX = sx;
+      }
+    }
+
+    // Split if there is a clean vertical valley between two side-by-side letters
+    const maxColSumThresh = Math.max(1, Math.round(segH * 0.035));
+    if (bestSplitX !== -1 && minColSum <= maxColSumThresh) {
+      const s1: Segment = { id: seg.id * 10 + 3, xMin: seg.xMin, xMax: seg.xMin + bestSplitX - 1, yMin: seg.yMin, yMax: seg.yMax };
+      const s2: Segment = { id: seg.id * 10 + 4, xMin: seg.xMin + bestSplitX + 1, xMax: seg.xMax, yMin: seg.yMin, yMax: seg.yMax };
+
+      const s1s = shrinkToBounds(s1);
+      const s2s = shrinkToBounds(s2);
+
+      const res: Segment[] = [];
+      if (s1s) res.push(...splitSegmentRecursive(s1s, depth + 1));
+      if (s2s) res.push(...splitSegmentRecursive(s2s, depth + 1));
+      return res;
+    }
+
+    return [seg];
+  }
+
+  // Split all merged blocks recursively
+  const expandedSegments: Segment[] = [];
+  segmentsList.forEach(s => {
+    expandedSegments.push(...splitSegmentRecursive(s, 0));
+  });
+
+  // 6. 1D clustering of Y coordinates to group characters into horizontal rows
+  const rowsList: Segment[][] = [];
+  const sortedByY = [...expandedSegments].sort((a, b) => a.yMin - b.yMin);
+
+  sortedByY.forEach(s => {
+    const sYCenter = (s.yMin + s.yMax) / 2;
+    let placed = false;
+
+    for (let r = 0; r < rowsList.length; r++) {
+      const row = rowsList[r];
+      const rowYCenters = row.map(item => (item.yMin + item.yMax) / 2);
+      const rowYAvg = rowYCenters.reduce((sum, val) => sum + val, 0) / row.length;
+
+      const rowHeights = row.map(item => item.yMax - item.yMin + 1);
+      const rowHAvg = rowHeights.reduce((sum, val) => sum + val, 0) / row.length;
+      const threshY = Math.max(rowHAvg * 0.75, Math.round(h * 0.045));
+
+      if (Math.abs(sYCenter - rowYAvg) < threshY) {
+        row.push(s);
+        placed = true;
+        break;
+      }
+    }
+
+    if (!placed) {
+      rowsList.push([s]);
+    }
+  });
+
+  // Sort rows from top to bottom
+  rowsList.sort((rowA, rowB) => {
+    const avgA = rowA.reduce((sum, s) => sum + (s.yMin + s.yMax) / 2, 0) / rowA.length;
+    const avgB = rowB.reduce((sum, s) => sum + (s.yMin + s.yMax) / 2, 0) / rowB.length;
+    return avgA - avgB;
+  });
+
+  // Sort components within each row from left to right
+  rowsList.forEach(row => {
+    row.sort((a, b) => a.xMin - b.xMin);
+  });
+
+  // Flatten rows back to a single 1D array of ordered segments
+  const sortedSegments: Segment[] = [];
+  rowsList.forEach(row => {
+    sortedSegments.push(...row);
+  });
+
+  // 7. Map segments to characters and crop/trace vectors
+  const segments: Array<{
+    id: number;
+    char: string;
+    croppedDataUrl: string;
+    pathData: string;
+    rect: { x: number; y: number; w: number; h: number };
+  }> = [];
+
+  const activeTextSeq = sequence.replace(/\s+/g, '').split('');
+
+  sortedSegments.forEach((seg, index) => {
+    const segW = seg.xMax - seg.xMin + 1;
+    const segH = seg.yMax - seg.yMin + 1;
+
+    // Apply healthy padding to capture complete stroke details
+    const px = Math.max(1, Math.round(segW * 0.12));
+    const py = Math.max(1, Math.round(segH * 0.12));
+
+    const rx = Math.max(0, seg.xMin - px);
+    const ry = Math.max(0, seg.yMin - py);
+    const rw = Math.min(w - rx, segW + 2 * px);
+    const rh = Math.min(h - ry, segH + 2 * py);
+
+    // Crop current character onto its own sub-canvas
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = rw;
+    cropCanvas.height = rh;
+    const cropCtx = cropCanvas.getContext('2d');
+    if (cropCtx) {
+      cropCtx.drawImage(canvas, rx, ry, rw, rh, 0, 0, rw, rh);
+      const croppedDataUrl = cropCanvas.toDataURL();
+
+      // Binarize crop to trace its vector contour boundary
+      const cropImgData = cropCtx.getImageData(0, 0, rw, rh);
+      const cropPixels = cropImgData.data;
+      const binaryMap = new Uint8Array(rw * rh);
+
+      for (let cy = 0; cy < rh; cy++) {
+        for (let cx = 0; cx < rw; cx++) {
+          const cidx = (cy * rw + cx) * 4;
+          const brightness = 0.299 * cropPixels[cidx] + 0.587 * cropPixels[cidx + 1] + 0.114 * cropPixels[cidx + 2];
+          binaryMap[cy * rw + cx] = brightness < thresh ? 1 : 0;
+        }
+      }
+
+      let pathData = '';
+      const visitedContour = new Uint8Array(rw * rh);
+
+      for (let cy = 1; cy < rh - 1; cy++) {
+        for (let cx = 1; cx < rw - 1; cx++) {
+          if (binaryMap[cy * rw + cx] === 1 && !visitedContour[cy * rw + cx]) {
+            const contourPoints: Array<[number, number]> = [];
+            let currX = cx;
+            let currY = cy;
+            let dir = 0;
+
+            const dx = [0, 1, 1, 1, 0, -1, -1, -1];
+            const dy = [-1, -1, 0, 1, 1, 1, 0, -1];
+
+            const startX = currX;
+            const startY = currY;
+            let limit = 2000;
+
+            while (limit > 0) {
+              limit--;
+              contourPoints.push([currX, currY]);
+              visitedContour[currY * rw + currX] = 1;
+
+              let foundNext = false;
+              let checkDir = (dir + 5) % 8;
+
+              for (let step = 0; step < 8; step++) {
+                const nx = currX + dx[checkDir];
+                const ny = currY + dy[checkDir];
+                if (nx >= 0 && nx < rw && ny >= 0 && ny < rh) {
+                  if (binaryMap[ny * rw + nx] === 1) {
+                    currX = nx;
+                    currY = ny;
+                    dir = checkDir;
+                    foundNext = true;
+                    break;
+                  }
+                }
+                checkDir = (checkDir + 1) % 8;
+              }
+
+              if (!foundNext) break;
+              if (currX === startX && currY === startY) break;
+            }
+
+            if (contourPoints.length > 3) {
+              const stepSize = Math.max(1, Math.floor(contourPoints.length / 50));
+              const decimatedPoints: Array<[number, number]> = [];
+              for (let pIdx = 0; pIdx < contourPoints.length; pIdx += stepSize) {
+                decimatedPoints.push(contourPoints[pIdx]);
+              }
+              if (decimatedPoints.length > 2) {
+                let subPath = '';
+                decimatedPoints.forEach(([px, py], pIdx) => {
+                  const sx = ((px / rw) * 86 + 7).toFixed(1);
+                  const sy = ((py / rh) * 80 + 10).toFixed(1);
+                  if (pIdx === 0) subPath += `M ${sx} ${sy}`;
+                  else subPath += ` L ${sx} ${sy}`;
+                });
+                subPath += ' Z';
+                pathData += subPath + ' ';
+              }
+            }
+          }
+        }
+      }
+
+      if (!pathData.trim()) {
+        pathData = `M 15 20 L 85 20 L 85 80 L 15 80 Z`;
+      }
+
+      const matchedChar = activeTextSeq[index] || '';
+
+      segments.push({
+        id: index,
+        char: matchedChar,
+        croppedDataUrl,
+        pathData: pathData.trim(),
+        rect: { x: rx, y: ry, w: rw, h: rh }
+      });
+    }
+  });
+
+  return segments;
+}
 
 interface StyleStudioProps {
   currentStyle: HandwritingStyle;
@@ -194,6 +734,25 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
   const [scanStep, setScanStep] = useState<string>('');
   const [scannedImageName, setScannedImageName] = useState<string>('');
   const [newScannedStyle, setNewScannedStyle] = useState<HandwritingStyle | null>(null);
+
+  // Smart Blank-less Digitizer states
+  const [smartScanState, setSmartScanState] = useState<'idle' | 'processing' | 'segmented' | 'done'>('idle');
+  const [smartScanImage, setSmartScanImage] = useState<string | null>(null);
+  const [smartScanSequence, setSmartScanSequence] = useState<string>('Аа Бб Вв Гг Дд Ее Ёё Жж Зз Ии Йй Кк Лл Мм Нн Оо Пп Рр Сс Тт Уу Фф Хх Цц Чч Шш Щщ Ъъ Ыы Ьь Ээ Юю Яя');
+  const [segmentedGlyphs, setSegmentedGlyphs] = useState<Array<{ id: number, char: string, croppedDataUrl: string, pathData: string, rect: { x: number, y: number, w: number, h: number } }>>([]);
+  const [smartScanProgress, setSmartScanProgress] = useState<string>('');
+  const [smartScanStyleName, setSmartScanStyleName] = useState<string>('Мой умный почерк фриланс');
+  const [binarizationThreshold, setBinarizationThreshold] = useState<number>(145);
+  const [isResegmenting, setIsResegmenting] = useState<boolean>(false);
+
+  // Debounced effect for threshold binarization slider change
+  useEffect(() => {
+    if (!smartScanImage || smartScanState !== 'segmented') return;
+    const handler = setTimeout(() => {
+      resegmentBase64(smartScanImage, binarizationThreshold);
+    }, 400); // 400ms debounce
+    return () => clearTimeout(handler);
+  }, [binarizationThreshold]);
 
   // AI blend sliders
   const [parentStyleA, setParentStyleA] = useState<string>(availableStyles[0]?.id || 'elegant-cursive');
@@ -999,6 +1558,95 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
     setNewScannedStyle(null);
   };
 
+  // Smart Blank-less Digitizer file handler
+  const handleSmartScanFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    runSmartScan(file, binarizationThreshold);
+  };
+
+  // Main Computer Vision algorithm for segmenting and outline tracing
+  const runSmartScan = (file: File, thresh: number) => {
+    setScannedImageName(file.name);
+    setSmartScanState('processing');
+    setSmartScanProgress('Анализ фото и структурация без бланка...');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setSmartScanImage(dataUrl);
+
+      const img = new Image();
+      img.onload = () => {
+        const segments = perform2DSegmentation(img, thresh, smartScanSequence);
+        setSegmentedGlyphs(segments);
+        setSmartScanProgress(`Обнаружено ${segments.length} букв. Сопоставьте последовательность!`);
+        setSmartScanState('segmented');
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleReallocateSequence = (newSeq: string) => {
+    setSmartScanSequence(newSeq);
+    const activeTextSeq = newSeq.replace(/\s+/g, '').split('');
+    setSegmentedGlyphs(prev => prev.map((seg, idx) => ({
+      ...seg,
+      char: activeTextSeq[idx] || ''
+    })));
+  };
+
+  const handleApplySmartScanStyle = () => {
+    const glyphsMap = { ...activeStyle.glyphs };
+
+    segmentedGlyphs.forEach(seg => {
+      if (seg.char && seg.char.trim()) {
+        glyphsMap[seg.char] = seg.pathData;
+      }
+    });
+
+    const isPreset = isPresetStyle(activeStyle.id);
+    const finalId = isPreset ? `smart-${Date.now()}` : activeStyle.id;
+    const finalName = isPreset ? smartScanStyleName : activeStyle.name;
+
+    const smartStyle: HandwritingStyle = {
+      id: finalId,
+      name: finalName,
+      creator: 'Умная оцифровка',
+      description: `Умная бесбланочная оцифровка почерка (${Object.keys(glyphsMap).length} символов).`,
+      slant: activeStyle.slant,
+      letterSpacing: activeStyle.letterSpacing,
+      baselineOffset: activeStyle.baselineOffset,
+      glyphs: glyphsMap,
+      useFont: false
+    };
+
+    onSaveStyle(smartStyle);
+    setSelectedStyleId(smartStyle.id);
+    setSmartScanState('idle');
+    setSegmentedGlyphs([]);
+    setSmartScanImage(null);
+
+    setToast({
+      message: `Почерк успешно сохранен! Всего добавлено/обновлено: ${Object.keys(glyphsMap).length} букв.`,
+      type: 'success'
+    });
+  };
+
+  // Re-run segmentation on already uploaded image after threshold changes
+  const resegmentBase64 = (dataUrl: string, thresh: number) => {
+    setIsResegmenting(true);
+
+    const img = new Image();
+    img.onload = () => {
+      const segments = perform2DSegmentation(img, thresh, smartScanSequence);
+      setSegmentedGlyphs(segments);
+      setIsResegmenting(false);
+    };
+    img.src = dataUrl;
+  };
+
   // Import custom ttf binary
   const handleFontUploadFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1192,6 +1840,12 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
 
   return (
     <div className="bg-slate-50 rounded-3xl border border-slate-200/60 overflow-hidden shadow-2xl flex flex-col min-h-[750px] relative">
+      <style dangerouslySetInnerHTML={{ __html: availableStyles.filter(s => s.fontUrl).map(s => `
+        @font-face {
+          font-family: '${s.fontFamily}';
+          src: url('${s.fontUrl}');
+        }
+      `).join('\n') }} />
       
       {/* Toast floating notifications overlay */}
       <AnimatePresence>
@@ -2172,7 +2826,7 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
               {/* Upload mechanisms trigger segment */}
               <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm">
                 
-                {scanState === 'idle' && (
+                {scanState === 'idle' && smartScanState === 'idle' && (
                   <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-purple-50 text-[#7c3aed] flex items-center justify-center rounded-2xl border border-purple-100 animate-pulse">
@@ -2188,6 +2842,24 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
 
                     <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                       
+                      {/* Smart Scan photo (No blank) */}
+                      <div className="relative flex-1 sm:flex-initial">
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
+                          id="myfonts-smartscan-input" 
+                          onChange={handleSmartScanFile}
+                        />
+                        <label 
+                          htmlFor="myfonts-smartscan-input" 
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border border-teal-250 bg-teal-50/50 hover:bg-teal-100/80 text-teal-700 rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-2xs"
+                        >
+                          <Sparkles size={11} className="text-teal-600 animate-pulse" />
+                          <span>Оцифровать без бланка (Smart)</span>
+                        </label>
+                      </div>
+
                       {/* Scan photo */}
                       <div className="relative flex-1 sm:flex-initial">
                         <input 
@@ -2223,6 +2895,208 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                           <span>Импортировать TTF</span>
                         </label>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Smart Scan processing */}
+                {smartScanState === 'processing' && (
+                  <div className="flex flex-col items-center justify-center py-6 gap-3 text-xs font-bold font-sans tracking-wide border border-dashed border-teal-200 rounded-2xl bg-teal-50/20">
+                    <div className="w-8 h-8 border-3 border-teal-500 border-t-transparent animate-spin rounded-full"></div>
+                    <span className="text-teal-600 animate-pulse">{smartScanProgress}</span>
+                    <span className="text-slate-400 font-semibold text-[10px]">Идёт тонкий разбор символов: {scannedImageName}</span>
+                  </div>
+                )}
+
+                {/* Smart Scan interactive allocation table */}
+                {smartScanState === 'segmented' && segmentedGlyphs.length > 0 && (
+                  <div className="flex flex-col gap-5 bg-teal-50/20 border border-teal-100 p-5 rounded-3xl mt-2 shadow-2xs text-left">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 pb-3 border-b border-teal-150">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800 uppercase flex items-center gap-1.5 font-sans">
+                          <Cpu size={14} className="text-teal-600 animate-pulse" />
+                          Результаты бесбланочной сегментации в векторе
+                        </h4>
+                        <p className="text-[10px] text-slate-500 font-semibold leading-relaxed mt-0.5">
+                          Обнаружено <span className="text-teal-600 font-extrabold">{segmentedGlyphs.length}</span> отдельных символов. Сопоставьте их с нужными буквами в таблице ниже!
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2.5 items-center w-full md:w-auto">
+                        {/* Threshold adjusting slider */}
+                        <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-[10px] font-bold">
+                          <span className="text-slate-500">Порог бинаризации:</span>
+                          <input 
+                            type="range"
+                            min="80"
+                            max="210"
+                            value={binarizationThreshold}
+                            onChange={(e) => {
+                              setBinarizationThreshold(parseInt(e.target.value));
+                            }}
+                            className="w-20 accent-teal-600 cursor-pointer"
+                          />
+                          <span className="text-teal-600 font-black font-mono">{binarizationThreshold}</span>
+                          {isResegmenting && (
+                            <div className="w-3.5 h-3.5 border-2 border-teal-500 border-t-transparent animate-spin rounded-full"></div>
+                          )}
+                        </div>
+
+                        {/* Title of customized style */}
+                        {isPresetStyle(activeStyle.id) && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-slate-500 font-bold">Имя почерка:</span>
+                            <input 
+                              type="text"
+                              placeholder="Название шрифта..."
+                              value={smartScanStyleName}
+                              onChange={(e) => setSmartScanStyleName(e.target.value)}
+                              className="px-2.5 py-1 text-[10px] font-bold border border-slate-200 rounded-xl bg-white w-40 focus:outline-[#7c3aed] focus:border-[#7c3aed]"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Sequential mapping controls */}
+                    <div className="flex flex-col gap-2 bg-white border border-slate-200 p-3.5 rounded-2xl shadow-2xs">
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1.5 text-[10.5px] font-bold text-slate-650">
+                        <span>Напишите последовательность букв на фото по порядку (для автораспределения):</span>
+                        <span className="text-teal-600 font-extrabold text-[10px] bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-md text-slate-700">
+                          Обнаружено знаков: {segmentedGlyphs.length}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={smartScanSequence}
+                          onChange={(e) => handleReallocateSequence(e.target.value)}
+                          className="flex-1 px-3 py-2 text-xs font-bold border border-slate-205 rounded-xl bg-slate-50 focus:bg-white focus:ring-1 focus:ring-teal-500 focus:border-teal-500 transition-all text-slate-800 font-mono tracking-wider"
+                          placeholder="АаБбВвГгДдЕеЁёЖжЗзИиЙйКк..."
+                        />
+                        <button
+                          onClick={() => handleReallocateSequence(smartScanSequence)}
+                          className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                        >
+                          <RefreshCw size={11} />
+                          <span>Обновить</span>
+                        </button>
+                      </div>
+
+                      {/* Quick presets helper */}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1 border-t border-slate-100 pt-2 pb-0.5">
+                        <span className="text-[9.5px] text-slate-400 font-extrabold uppercase select-none mr-1">Быстрый шаблон:</span>
+                        {[
+                          {
+                            label: 'Прописи (Аа Бб... без заглавных Ъ, Ы, Ь)',
+                            seq: 'Аа Бб Вв Гг Дд Ее Ёё Жж Зз Ии Йй Кк Лл Мм Нн Оо Пп Рр Сс Тт Уу Фф Хх Цц Чч Шш Щщ ъ ы ь Ээ Юю Яя'
+                          },
+                          {
+                            label: 'Стандарт (Аа Бб... со всеми заглавными)',
+                            seq: 'Аа Бб Вв Гг Дд Ее Ёё Жж Зз Ии Йй Кк Лл Мм Нн Оо Пп Рр Сс Тт Уу Фф Хх Цц Чч Шш Щщ Ъъ Ыы Ьь Ээ Юю Яя'
+                          },
+                          {
+                            label: 'Строчные (а б в...)',
+                            seq: 'а б в г д е ё ж з и й к л м н о п р с т у ф х ц ч ш щ ъ ы ь э ю я'
+                          },
+                          {
+                            label: 'Заглавные (А Б В...)',
+                            seq: 'А Б В Г Д Е Ё Ж З И Й К Л М Н О П Р С Т У Ф Х Ц Ч Ш Щ Э Ю Я'
+                          },
+                          {
+                            label: 'Latin (Aa Bb...)',
+                            seq: 'Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz'
+                          }
+                        ].map((preset, idx) => {
+                          const isMatched = smartScanSequence.replace(/\s+/g, '') === preset.seq.replace(/\s+/g, '');
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handleReallocateSequence(preset.seq)}
+                              className={`px-2 py-0.5 border text-[10px] font-extrabold rounded-lg transition-all cursor-pointer ${
+                                isMatched
+                                  ? 'bg-teal-100/65 border-teal-300 text-teal-800 shadow-3xs scale-[1.01]'
+                                  : 'bg-slate-50 border-slate-205 text-slate-500 hover:bg-slate-100 hover:text-slate-850'
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <p className="text-[9.5px] text-slate-400 font-medium leading-relaxed mt-1">
+                        Совет: Если в строках написаны пары "малая и большая буква" (например, <span className="font-mono text-teal-600 font-bold">Аа Бб Вв Гг</span>), укажите их подряд без пробелов. Интеллектуальный алгоритм автоматически сопоставит {segmentedGlyphs.length} выделенных контуров с вашими буквами в строке. Любую букву можно в любой момент скорректировать вручную в полях под плитками!
+                      </p>
+                    </div>
+
+                    {/* Interactive crop grid of characters */}
+                    <div className={`grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 max-h-[300px] overflow-y-auto p-1 bg-slate-50/50 border border-slate-100 rounded-2xl transition-all duration-200 ${isResegmenting ? 'opacity-40 pointer-events-none cursor-wait' : ''}`}>
+                      {segmentedGlyphs.map((seg, idx) => (
+                        <div 
+                          key={seg.id} 
+                          className="bg-white border border-slate-200 hover:border-teal-400 p-2.5 rounded-2xl flex flex-col gap-2 relative shadow-2xs group transition-all"
+                        >
+                          <span className="absolute top-1.5 left-2 text-[9px] font-bold text-slate-400 bg-slate-100 border border-slate-205 px-1 rounded-md">
+                            #{idx + 1}
+                          </span>
+
+                          {/* Image preview */}
+                          <div className="aspect-square bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center p-1.5 relative overflow-hidden h-20 w-full mx-auto">
+                            <img 
+                              src={seg.croppedDataUrl} 
+                              alt={`Сегмент ${idx + 1}`} 
+                              className="h-full w-full object-contain filter contrast-125 select-none"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+
+                          {/* Vector trace outline preview overlay */}
+                          <div className="absolute inset-x-2 top-2 h-20 bg-teal-900/95 rounded-xl opacity-0 group-hover:opacity-100 transition-all flex flex-col items-center justify-center p-1 pointer-events-none">
+                            <svg viewBox="0 0 100 100" className="w-[70%] h-[70%] text-cyan-200">
+                              <path d={seg.pathData} fill="currentColor" fillRule="evenodd" />
+                            </svg>
+                            <span className="text-[7.5px] font-black text-cyan-300 uppercase tracking-widest mt-1">Вектор</span>
+                          </div>
+
+                          {/* Input character to match */}
+                          <div className="flex flex-col gap-1 mt-1">
+                            <label className="text-[8px] font-bold text-slate-400 uppercase tracking-wider text-center">Буква символа</label>
+                            <input 
+                              type="text"
+                              maxLength={3}
+                              value={seg.char}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setSegmentedGlyphs(prev => prev.map(s => s.id === seg.id ? { ...s, char: val } : s));
+                              }}
+                              className="w-full text-center py-1 bg-slate-50 border border-slate-200 hover:bg-slate-100 focus:bg-white text-xs font-black rounded-lg text-slate-800 transition-all focus:outline-teal-500 focus:border-teal-500"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Form actions */}
+                    <div className="flex md:self-end gap-2 pt-3 border-t border-teal-150 w-full md:w-auto">
+                      <button
+                        onClick={handleApplySmartScanStyle}
+                        className="flex-1 md:flex-initial px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle size={13} />
+                        <span>Добавить и обновить в текущий шрифт</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSmartScanState('idle');
+                          setSegmentedGlyphs([]);
+                          setSmartScanImage(null);
+                        }}
+                        className="px-4 py-2.5 bg-slate-205 hover:bg-slate-300 text-slate-650 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Сбросить
+                      </button>
                     </div>
                   </div>
                 )}
@@ -2409,7 +3283,7 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                                     x="50" 
                                     y="67" 
                                     textAnchor="middle" 
-                                    fontFamily="'Marck Script', 'Caveat', 'Neucha', 'Bad Script', cursive, sans-serif" 
+                                    fontFamily={activeStyle?.useFont && activeStyle?.fontFamily ? `'${activeStyle.fontFamily}', sans-serif` : "'Marck Script', 'Caveat', 'Neucha', 'Bad Script', cursive, sans-serif"} 
                                     fontSize="75" 
                                     fill="currentColor"
                                   >
@@ -2647,7 +3521,7 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                       {/* Aligning Context letters */}
                       <div 
                         className="w-full h-full flex items-center justify-center gap-1.5 text-white text-4xl font-normal select-none relative"
-                        style={{ fontFamily: "'Marck Script', 'Caveat', 'Neucha', 'Bad Script', cursive, sans-serif" }}
+                        style={{ fontFamily: activeStyle?.useFont && activeStyle?.fontFamily ? `'${activeStyle.fontFamily}', sans-serif` : "'Marck Script', 'Caveat', 'Neucha', 'Bad Script', cursive, sans-serif" }}
                       >
                         
                         {/* Shuffled surrounding characters in cursive */}
@@ -2712,7 +3586,7 @@ export default function StyleStudio({ currentStyle, onSaveStyle, availableStyles
                                 <span 
                                   className="text-cyan-300 text-4xl font-normal"
                                   style={{
-                                    fontFamily: "'Marck Script', 'Caveat', 'Neucha', 'Bad Script', cursive, sans-serif",
+                                    fontFamily: activeStyle?.useFont && activeStyle?.fontFamily ? `'${activeStyle.fontFamily}', sans-serif` : "'Marck Script', 'Caveat', 'Neucha', 'Bad Script', cursive, sans-serif",
                                     transform: `scale(${adj.scale}) translate(0px, ${adj.baseline}px)`,
                                     transformOrigin: 'center',
                                     transition: 'transform 0.1s ease-out'

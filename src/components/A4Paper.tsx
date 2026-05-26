@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { PageConfig, HandwritingStyle, Drawing, ToolType, InkColor } from '../types';
-import { PAGE_HEIGHT, PAGE_WIDTH, parseLaTeXFormula, RenderedPage, renderGlyphToSVGPath } from '../utils/handwritingEngine';
+import { PageConfig, HandwritingStyle, Drawing, ToolType, InkColor, PageSize } from '../types';
+import { PAGE_HEIGHT, PAGE_WIDTH, getPageDimensions, parseLaTeXFormula, RenderedPage, renderGlyphToSVGPath } from '../utils/handwritingEngine';
 import { Download, FileDown, Eye, FileText, ChevronLeft, ChevronRight, Sparkles, Printer } from 'lucide-react';
 
 const DRAWING_COLORS: Record<string, string> = {
@@ -237,6 +237,7 @@ function HandwritingPageSVG({
   animationSpeed,
   getPaperBgFill
 }: HandwritingPageSVGProps) {
+  const { width: PAGE_WIDTH, height: PAGE_HEIGHT } = getPageDimensions(config.pageSize);
   // Dynamic stroke properties based on writing tool emulation
   const getStrokeProps = (baseThickness: number, penStyle: string, inkColor: string, toolType?: string) => {
     let thickness = baseThickness;
@@ -1116,6 +1117,25 @@ function HandwritingPageSVG({
 }
 
 export default function A4Paper({ pages, config, fontSize, style }: A4PaperProps) {
+  const { width: PAGE_WIDTH, height: PAGE_HEIGHT } = getPageDimensions(config.pageSize);
+  
+  const getPhysicalDimensions = (pageSize?: PageSize) => {
+    switch (pageSize) {
+      case 'A5':
+        return { width: '148mm', height: '210mm', sizeSpec: '148mm 210mm portrait' };
+      case 'A6':
+        return { width: '105mm', height: '148mm', sizeSpec: '105mm 148mm portrait' };
+      case 'letter':
+        return { width: '215.9mm', height: '279.4mm', sizeSpec: 'letter portrait' };
+      case 'notebook':
+        return { width: '170mm', height: '205mm', sizeSpec: '170mm 205mm portrait' };
+      case 'A4':
+      default:
+        return { width: '210mm', height: '297mm', sizeSpec: 'A4 portrait' };
+    }
+  };
+  const dims = getPhysicalDimensions(config.pageSize);
+
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [isAnimating, setIsAnimating] = useState<boolean>(false);
   const [animationSpeed, setAnimationSpeed] = useState<number>(1.5); // seconds to draw
@@ -1169,7 +1189,7 @@ export default function A4Paper({ pages, config, fontSize, style }: A4PaperProps
           position: absolute !important;
           left: 0 !important;
           top: 0 !important;
-          width: 210mm !important;
+          width: ${dims.width} !important;
           height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
@@ -1177,12 +1197,12 @@ export default function A4Paper({ pages, config, fontSize, style }: A4PaperProps
           overflow: visible !important;
         }
         @page {
-          size: A4 portrait;
+          size: ${dims.sizeSpec};
           margin: 0px !important;
         }
         .print-page {
-          width: 210mm !important;
-          height: 297mm !important;
+          width: ${dims.width} !important;
+          height: ${dims.height} !important;
           position: relative !important;
           page-break-inside: avoid !important;
           page-break-before: auto !important;
@@ -1643,7 +1663,7 @@ export default function A4Paper({ pages, config, fontSize, style }: A4PaperProps
           }
         }
         @page {
-          size: A4 portrait;
+          size: ${dims.sizeSpec};
           margin: 0px !important;
         }
         @media screen {
@@ -1658,8 +1678,8 @@ export default function A4Paper({ pages, config, fontSize, style }: A4PaperProps
           html, body {
             margin: 0px !important;
             padding: 0px !important;
-            width: 210mm !important;
-            height: 297mm !important;
+            width: ${dims.width} !important;
+            height: ${dims.height} !important;
             overflow: visible !important;
             background-color: #ffffff !important;
             -webkit-print-color-adjust: exact !important;
@@ -1676,7 +1696,7 @@ export default function A4Paper({ pages, config, fontSize, style }: A4PaperProps
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 210mm !important;
+            width: ${dims.width} !important;
             height: auto !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -1684,8 +1704,8 @@ export default function A4Paper({ pages, config, fontSize, style }: A4PaperProps
             background-color: #ffffff !important;
           }
           .print-page {
-            width: 210mm !important;
-            height: 297mm !important;
+            width: ${dims.width} !important;
+            height: ${dims.height} !important;
             page-break-inside: avoid !important;
             page-break-before: auto !important;
             page-break-after: always !important;

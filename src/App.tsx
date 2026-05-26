@@ -226,6 +226,18 @@ export const getToolThicknessMeta = (inkColor: string, toolType?: string) => {
 // Default preloaded handwriting presets (containing beautiful parameters)
 const DEFAULT_PRESETS: HandwritingStyle[] = [
   {
+    id: 'propisi-font',
+    name: 'Школьные Прописи (Каллиграфия)',
+    creator: 'Минпросвещения / СССР',
+    description: 'Идеальный классический каллиграфический стиль школьного чистописания с красивыми непрерывными соединениями и наклоном.',
+    slant: 14,
+    letterSpacing: 1.0,
+    baselineOffset: 1,
+    glyphs: {},
+    useFont: true,
+    fontFamily: 'Bad Script'
+  },
+  {
     id: 'caveat-font',
     name: 'Школьный Кавеат (Ольга К.)',
     creator: 'Ольга К.',
@@ -387,6 +399,15 @@ const DEFAULT_PRESETS: HandwritingStyle[] = [
 
 // Presets mapping that updates sliders and config details dynamically to match style personalities
 const STYLE_CONFIG_PRESETS: Record<string, Partial<PageConfig>> = {
+  'propisi-font': {
+    tiltVariance: 1.0,
+    spacingVariance: 0.2,
+    baselineVariance: 0.1,
+    noiseLevel: 0.1,
+    fontFamily: 'serif',
+    strokeThickness: 1.1,
+    lineSpacing: 28,
+  },
   'elegant-cursive': {
     tiltVariance: 2,
     spacingVariance: 0.4,
@@ -556,7 +577,7 @@ export default function App() {
   
   // Custom Styles state
   const [styles, setStyles] = useState<HandwritingStyle[]>(DEFAULT_PRESETS);
-  const [selectedStyleId, setSelectedStyleId] = useState<string>('caveat-font');
+  const [selectedStyleId, setSelectedStyleId] = useState<string>('propisi-font');
   const activeStyle = styles.find(s => s.id === selectedStyleId) || styles[0];
 
   // Interface for custom user signatures associated with fonts
@@ -632,6 +653,7 @@ export default function App() {
   // Sheet configuration state
   const [config, setConfig] = useState<PageConfig>({
     paperType: 'lined',
+    pageSize: 'A4',
     fontFamily: 'sans',
     inkColor: 'blue',
     penStyle: 'gel',
@@ -1029,6 +1051,13 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 antialiased overflow-x-hidden pb-10">
+      {/* Dynamic font-face injectors to guarantee uploaded TTF/OTF fonts work perfectly inside browser preview */}
+      <style dangerouslySetInnerHTML={{ __html: styles.filter(s => s.fontUrl).map(s => `
+        @font-face {
+          font-family: '${s.fontFamily}';
+          src: url('${s.fontUrl}');
+        }
+      `).join('\n') }} />
       {/* Brand Header */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm px-6 py-4">
         <div className="max-w-7xl mx-auto flex flex-wrap gap-4 items-center justify-between">
@@ -1518,6 +1547,55 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
                               }`}
                             >
                               {f.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Paper Size Dropdown */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveDropdown(activeDropdown === 'pageSize' ? null : 'pageSize')}
+                        className={`flex items-center gap-1.5 px-2 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          activeDropdown === 'pageSize' ? 'bg-white border-blue-400 text-blue-600 shadow-xs' : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                        title="Размер листа"
+                      >
+                        <span className="text-[11px]">
+                          {config.pageSize === 'A5' 
+                            ? 'A5 Блокнот' 
+                            : config.pageSize === 'A6' 
+                            ? 'A6 Карман' 
+                            : config.pageSize === 'letter' 
+                            ? 'US Letter' 
+                            : config.pageSize === 'notebook' 
+                            ? 'Тетрадь' 
+                            : 'A4 Стандарт'}
+                        </span>
+                        <ChevronDown size={10} className="text-gray-400" />
+                      </button>
+                      {activeDropdown === 'pageSize' && (
+                        <div className="absolute top-[110%] left-0 z-50 w-36 bg-white border border-gray-200 rounded-xl shadow-xl p-1.5 animate-in fade-in duration-100">
+                          {[
+                            { id: 'A4', label: '📄 A4 Стандарт' },
+                            { id: 'A5', label: '📒 A5 Блокнот' },
+                            { id: 'A6', label: '🏷️ A6 Карман' },
+                            { id: 'letter', label: '🇺🇸 US Letter' },
+                            { id: 'notebook', label: '🏫 Тетрадь' },
+                          ].map((sz) => (
+                            <button
+                              key={sz.id}
+                              onClick={() => {
+                                setConfig({ ...config, pageSize: sz.id as any });
+                                setActiveDropdown(null);
+                              }}
+                              className={`w-full text-left p-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                                sz.id === (config.pageSize || 'A4') ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              {sz.label}
                             </button>
                           ))}
                         </div>
@@ -2261,7 +2339,7 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[10px] sm:text-[11px] font-bold text-gray-400 block mb-1">ТИП БУМАГИ</label>
                       <select
@@ -2272,6 +2350,21 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
                         <option value="lined">Линейка</option>
                         <option value="squared">Клетка</option>
                         <option value="blank">Чистый лист</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] sm:text-[11px] font-bold text-gray-400 block mb-1">ФОРМАТ ЛИСТА</label>
+                      <select
+                        value={config.pageSize || 'A4'}
+                        onChange={(e) => setConfig({ ...config, pageSize: e.target.value as any })}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2 text-xs font-bold"
+                      >
+                        <option value="A4">📄 A4 (Широкий)</option>
+                        <option value="A5">📒 A5 (Блокнот)</option>
+                        <option value="A6">🏷️ A6 (Карманный)</option>
+                        <option value="letter">🇺🇸 US Letter</option>
+                        <option value="notebook">🏫 Тетрадь</option>
                       </select>
                     </div>
 
@@ -3301,6 +3394,55 @@ $$ \\log_2(x) + \\ln(y) = \\tan(\\phi) $$
                             }`}
                           >
                             {f.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Размер листа в Fullscreen */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setActiveDropdown(activeDropdown === 'fs-pageSize' ? null : 'fs-pageSize')}
+                      className={`flex items-center gap-1.5 px-2 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                        activeDropdown === 'fs-pageSize' ? 'bg-slate-800 border-blue-500 text-blue-400' : 'bg-slate-850 border-slate-700 hover:bg-slate-750'
+                      }`}
+                      title="Выбрать формат листа"
+                    >
+                      <span className="text-[11px]">
+                        {config.pageSize === 'A5' 
+                          ? 'A5 Блокнот' 
+                          : config.pageSize === 'A6' 
+                          ? 'A6 Карман' 
+                          : config.pageSize === 'letter' 
+                          ? 'US Letter' 
+                          : config.pageSize === 'notebook' 
+                          ? 'Тетрадь' 
+                          : 'A4 Стандарт'}
+                      </span>
+                      <ChevronDown size={10} className="text-slate-400" />
+                    </button>
+                    {activeDropdown === 'fs-pageSize' && (
+                      <div className="absolute top-[110%] left-0 z-50 w-36 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-1.5 animate-in fade-in duration-100 text-slate-200">
+                        {[
+                          { id: 'A4', label: '📄 A4 Стандарт' },
+                          { id: 'A5', label: '📒 A5 Блокнот' },
+                          { id: 'A6', label: '🏷️ A6 Карман' },
+                          { id: 'letter', label: '🇺🇸 US Letter' },
+                          { id: 'notebook', label: '🏫 Тетрадь' },
+                        ].map((sz) => (
+                          <button
+                            key={sz.id}
+                            onClick={() => {
+                              setConfig({ ...config, pageSize: sz.id as any });
+                              setActiveDropdown(null);
+                            }}
+                            className={`w-full text-left p-1.5 rounded-md text-xs font-semibold cursor-pointer ${
+                              sz.id === (config.pageSize || 'A4') ? 'bg-blue-950 text-blue-400 font-extrabold' : 'hover:bg-slate-800 text-slate-300'
+                            }`}
+                          >
+                            {sz.label}
                           </button>
                         ))}
                       </div>

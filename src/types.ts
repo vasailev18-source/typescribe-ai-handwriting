@@ -19,8 +19,11 @@ export interface HandwritingStyle {
   isPrinted?: boolean;
 }
 
+export type PageSize = 'A4' | 'A5' | 'A6' | 'letter' | 'notebook';
+
 export interface PageConfig {
   paperType: PaperType;
+  pageSize?: PageSize;
   fontFamily: 'sans' | 'serif';
   inkColor: InkColor;
   toolType?: ToolType;
